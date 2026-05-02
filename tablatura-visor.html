@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Cancionero</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:wght@400;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fdf8f0;
+    --ink: #1a1208;
+    --ink-muted: #6b5c3e;
+    --ink-light: #a89070;
+    --accent: #8b2e0f;
+    --accent-light: #c84a1e;
+    --staff-line: #d4c4a0;
+    --highlight: #fff3b0;
+    --tab-bg: #1a1a2e;
+    --tab-text: #e0e0ff;
+    --tab-string: #4a9eff;
+    --tab-fret: #ffcc44;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-mono: 'Courier Prime', 'Courier New', monospace;
+    --font-body: 'Lato', sans-serif;
+    --font-size: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #e8dcc8;
+    background-image: 
+      radial-gradient(ellipse at 20% 50%, rgba(139,46,15,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(90,60,20,0.08) 0%, transparent 50%);
+    min-height: 100vh;
+    font-family: var(--font-body);
+    color: var(--ink);
+  }
+
+  /* ── HEADER ── */
+  .site-header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
+
+  .site-title {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-style: italic;
+    color: #e8c97a;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .site-title span { color: var(--paper); font-style: normal; font-size: 1rem; display: block; font-family: var(--font-body); letter-spacing: 0.2em; text-transform: uppercase; font-weight: 300; }
+
+  .toolbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.25);
+    color: var(--paper);
+    padding: 0.35rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.5); }
+  .btn.active { background: var(--accent-light); border-color: var(--accent-light); }
+  .btn-accent { background: var(--accent); border-color: var(--accent); }
+  .btn-accent:hover { background: var(--accent-light); }
+
+  .sep { width: 1px; height: 28px; background: rgba(255,255,255,0.2); }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 60px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 1.5rem 1rem;
+    overflow-y: auto;
+    max-height: calc(100vh - 60px);
+    position: sticky;
+    top: 60px;
+  }
+
+  .sidebar h3 {
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .song-list { list-style: none; margin-bottom: 2rem; }
+  .song-list li {
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 2px;
+  }
+  .song-list li:hover { background: rgba(255,255,255,0.08); }
+  .song-list li.active { background: var(--accent); }
+  .song-list li .song-artist { display: block; font-size: 0.7rem; color: var(--ink-light); margin-top: 1px; }
+  .song-list li.active .song-artist { color: rgba(255,255,255,0.7); }
+  .song-list li .song-name { font-size: 0.9rem; font-weight: 400; }
+
+  .add-song-btn {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px dashed rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.5);
+    padding: 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .add-song-btn:hover { background: rgba(255,255,255,0.1); color: var(--paper); border-color: rgba(255,255,255,0.4); }
+
+  /* ── MAIN ── */
+  .main {
+    padding: 2rem;
+    overflow-y: auto;
+  }
+
+  /* ── PAPER CARD ── */
+  .paper-card {
+    background: var(--paper);
+    border-radius: 2px;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.15), 0 0 40px rgba(0,0,0,0.1);
+    max-width: 820px;
+    margin: 0 auto;
+    position: relative;
+    padding: 3rem 3.5rem;
+  }
+
+  .paper-card::before {
+    content: '';
+    position: absolute;
+    left: 60px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255,100,100,0.3);
+  }
+
+  /* Staff lines decoration */
+  .paper-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: repeating-linear-gradient(
+      transparent, transparent 27px, var(--staff-line) 27px, var(--staff-line) 28px
+    );
+    pointer-events: none;
+    opacity: 0.35;
+    border-radius: 2px;
+  }
+
+  .card-content { position: relative; z-index: 1; }
+
+  /* ── SONG HEADER ── */
+  .song-header {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--ink);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: end;
+  }
+
+  .song-title {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--ink);
+  }
+
+  .song-artist-display {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--ink-muted);
+    margin-top: 0.25rem;
+  }
+
+  .song-meta {
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    font-family: var(--font-body);
+    line-height: 1.8;
+  }
+
+  .song-meta strong { color: var(--accent); font-size: 1rem; display: block; }
+
+  /* ── CHORD DIAGRAMS ROW ── */
+  .chord-diagrams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: rgba(0,0,0,0.03);
+    border-radius: 4px;
+    border: 1px solid var(--staff-line);
+  }
+
+  .chord-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .chord-diagram:hover { transform: scale(1.08); }
+  .chord-diagram.active-chord .chord-name { color: var(--accent-light); }
+
+  .chord-name {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink);
+    text-align: center;
+  }
+
+  .chord-grid {
+    position: relative;
+  }
+
+  /* ── LYRICS + CHORDS ── */
+  .lyrics-section { margin-bottom: 2rem; }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    margin-top: 1.5rem;
+    font-family: var(--font-body);
+  }
+
+  .lyric-line {
+    margin-bottom: 0.15rem;
+    min-height: 1.4em;
+    font-size: var(--font-size);
+    line-height: 1.4;
+    position: relative;
+  }
+
+  .chord-line {
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 1.4em;
+    margin-bottom: 0;
+    align-items: flex-end;
+  }
+
+  .chord-word {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-right: 0;
+    white-space: pre;
+  }
+
+  .chord-label {
+    font-family: var(--font-display);
+    font-size: calc(var(--font-size) * 0.85);
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+    min-height: 1.1em;
+    margin-bottom: 1px;
+    letter-spacing: 0.02em;
+  }
+
+  .chord-label:empty::before { content: '\00a0'; }
+
+  .chord-text {
+    font-size: var(--font-size);
+    font-family: var(--font-body);
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* ── TAB VIEW ── */
+  .tab-section {
+    display: none;
+    background: var(--tab-bg);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+  }
+
+  .tab-section.visible { display: block; }
+
+  .tab-title {
+    font-family: var(--font-body);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 1rem;
+  }
+
+  .tab-block {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--tab-text);
+    white-space: pre;
+  }
+
+  .tab-string-name { color: var(--tab-string); }
+  .tab-fret-num { color: var(--tab-fret); }
+
+  /* ── CHORD TOOLTIP ── */
+  .chord-tooltip {
+    display: none;
+    position: fixed;
+    background: var(--ink);
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    z-index: 500;
+    pointer-events: none;
+  }
+  .chord-tooltip.visible { display: block; }
+  .chord-tooltip .chord-name { color: #e8c97a; font-size: 1.1rem; margin-bottom: 0.5rem; }
+
+  /* ── CONTROLS ── */
+  .controls-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(0,0,0,0.06);
+    border: 1px solid var(--staff-line);
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+  }
+
+  .control-label { font-size: 0.7rem; color: var(--ink-muted); letter-spacing: 0.05em; }
+
+  .ctrl-btn {
+    width: 26px; height: 26px;
+    border: 1px solid var(--staff-line);
+    background: var(--paper);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink);
+    transition: all 0.1s;
+  }
+  .ctrl-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+
+  .ctrl-value {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    min-width: 30px;
+    text-align: center;
+    color: var(--ink);
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+
+  .modal {
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 2rem;
+    width: 90%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal h2 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--ink);
+  }
+
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); margin-bottom: 0.3rem; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--staff-line);
+    border-radius: 4px;
+    background: white;
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    min-height: 200px;
+    resize: vertical;
+  }
+
+  .form-hint {
+    font-size: 0.7rem;
+    color: var(--ink-light);
+    margin-top: 0.25rem;
+    line-height: 1.5;
+  }
+
+  .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
+
+  .btn-modal {
+    padding: 0.6rem 1.5rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+  .btn-modal.primary { background: var(--accent); color: white; }
+  .btn-modal.primary:hover { background: var(--accent-light); }
+  .btn-modal.secondary { background: rgba(0,0,0,0.08); color: var(--ink); }
+  .btn-modal.secondary:hover { background: rgba(0,0,0,0.15); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--ink-muted);
+  }
+  .empty-state h2 { font-family: var(--font-display); font-style: italic; font-size: 1.8rem; margin-bottom: 0.5rem; }
+  .empty-state p { font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .paper-card { padding: 2rem 1.5rem; }
+    .paper-card::before { left: 30px; }
+  }
+
+  /* ── MODO MÓVIL ── */
+  body.mobile {
+    --font-size: 19px;
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  body.mobile .site-header {
+    padding: 0.6rem 1rem;
+    flex-wrap: nowrap;
+  }
+
+  body.mobile .site-title { font-size: 1.1rem; min-width: 0; }
+  body.mobile .site-title span { display: none; }
+
+  body.mobile .toolbar {
+    gap: 0.3rem;
+    flex-wrap: nowrap;
+  }
+
+  body.mobile .btn { padding: 0.4rem 0.55rem; font-size: 0.72rem; }
+  body.mobile .sep { display: none; }
+
+  body.mobile .layout {
+    grid-template-columns: 1fr;
+    height: calc(100dvh - 50px);
+    overflow: hidden;
+  }
+
+  body.mobile .sidebar { display: none; }
+
+  body.mobile .main {
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    padding-bottom: 1rem;
+  }
+
+  body.mobile .paper-card {
+    border-radius: 0;
+    box-shadow: none;
+    padding: 1.25rem 1rem 2rem;
+    max-width: 100%;
+  }
+  body.mobile .paper-card::before { left: 24px; }
+
+  body.mobile .song-title { font-size: 1.5rem; }
+  body.mobile .song-artist-display { font-size: 0.9rem; }
+  body.mobile .song-header { margin-bottom: 1rem; }
+
+  body.mobile .chord-diagrams {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.75rem;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  body.mobile .chord-diagrams::-webkit-scrollbar { display: none; }
+
+  body.mobile .chord-diagram canvas { width: 64px !important; height: 80px !important; }
+
+  body.mobile .ctrl-btn { width: 38px; height: 38px; font-size: 1.1rem; }
+  body.mobile .controls-bar { gap: 0.4rem; margin-bottom: 1rem; }
+  body.mobile .control-group { padding: 0.4rem 0.7rem; }
+
+  /* Acordes en móvil: scroll horizontal en vez de wrap */
+  body.mobile .chord-diagrams { overflow-x: scroll; }
+
+  /* Lista de canciones en móvil: panel deslizante */
+  body.mobile .mobile-song-panel {
+    display: flex !important;
+  }
+
+  .mobile-song-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.6);
+  }
+
+  .mobile-song-panel-inner {
+    background: var(--ink);
+    color: var(--paper);
+    width: 80%;
+    max-width: 320px;
+    height: 100%;
+    overflow-y: auto;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .mobile-panel-close {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0 0.5rem;
+    margin-bottom: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── PANTALLA DE LOGIN ── -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:var(--ink);z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;">
+  <div style="font-family:'Playfair Display',Georgia,serif;font-style:italic;font-size:2.5rem;color:#e8c97a;">Cancionero</div>
+  <div style="font-family:'Lato',sans-serif;font-size:0.85rem;color:rgba(255,255,255,0.5);letter-spacing:0.15em;text-transform:uppercase;">tu colección de tablaturas</div>
+  <button onclick="loginWithGoogle()" style="margin-top:1rem;display:flex;align-items:center;gap:0.75rem;background:white;color:#333;border:none;border-radius:8px;padding:0.8rem 1.5rem;font-size:1rem;font-family:'Lato',sans-serif;cursor:pointer;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,0.3);transition:transform 0.15s;" onmouseover="this.style.transform='scale(1.03)'" onmouseout="this.style.transform=''">
+    <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Entrar con Google
+  </button>
+</div>
+
+<!-- ── APP SHELL ── -->
+<div id="appShell" style="display:none;">
+
+<header class="site-header">
+  <div class="site-title">
+    <span>mi colección</span>
+    Cancionero
+  </div>
+  <div class="toolbar">
+    <button class="btn" id="btn-chords" onclick="toggleChords()">Acordes</button>
+    <button class="btn" id="btn-tab" onclick="toggleTab()">Tablatura</button>
+    <div class="sep"></div>
+    <button class="btn" onclick="transpose(-1)">♭ −1</button>
+    <button class="btn" onclick="transpose(1)">♯ +1</button>
+    <button class="btn" onclick="resetTranspose()">○</button>
+    <div class="sep"></div>
+    <button class="btn" id="btn-mobile" onclick="toggleMobileMode()" title="Modo móvil">📱</button>
+    <button class="btn" id="btn-songs-panel" onclick="openSongPanel()" style="display:none;" title="Lista de canciones">☰</button>
+    <button class="btn btn-accent" onclick="openAddSong()">+ Canción</button>
+    <button class="btn" onclick="openImport()" title="Importar de La Cuerda">↓ La Cuerda</button>
+    <img id="userAvatar" src="" style="width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,0.3);object-fit:cover;" onclick="logout()" title="Cerrar sesión">
+  </div>
+</header>
+
+<!-- Panel de canciones para móvil -->
+<div class="mobile-song-panel" id="mobileSongPanel" onclick="closeSongPanel()">
+  <div class="mobile-song-panel-inner" onclick="event.stopPropagation()">
+    <button class="mobile-panel-close" onclick="closeSongPanel()">✕</button>
+    <h3 style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:1rem;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:0.5rem;">Canciones</h3>
+    <ul class="song-list" id="songListMobile"></ul>
+    <button class="add-song-btn" onclick="closeSongPanel();openAddSong();">＋ Añadir canción</button>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h3>Canciones</h3>
+    <ul class="song-list" id="songList"></ul>
+    <button class="add-song-btn" onclick="openAddSong()">
+      ＋ Añadir canción
+    </button>
+  </aside>
+
+  <main class="main">
+    <div id="mainContent"></div>
+  </main>
+</div>
+
+<!-- Chord tooltip -->
+<div class="chord-tooltip" id="chordTooltip">
+  <div class="chord-name" id="tooltipName"></div>
+  <canvas id="tooltipCanvas" width="100" height="110"></canvas>
+</div>
+
+<!-- Add Song Modal -->
+<div class="modal-overlay" id="addSongModal">
+  <div class="modal">
+    <h2>Nueva canción</h2>
+    <div class="form-group">
+      <label>Título</label>
+      <input type="text" id="newTitle" placeholder="Nombre de la canción">
+    </div>
+    <div class="form-group">
+      <label>Artista</label>
+      <input type="text" id="newArtist" placeholder="Nombre del artista">
+    </div>
+    <div class="form-group">
+      <label>Tonalidad</label>
+      <select id="newKey">
+        <option>Am</option><option>Em</option><option>Dm</option>
+        <option>C</option><option>G</option><option>D</option>
+        <option>F</option><option>E</option><option>A</option>
+        <option>Bm</option><option>F#m</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Letra con acordes</label>
+      <textarea id="newLyrics" placeholder="[Intro]
+[Am]Aquí va la [C]letra de la [G]canción
+Con los [Em]acordes encima de las [Am]palabras
+
+[Estribillo]
+[F]Escribe los acordes [C]entre corchetes
+[G]Justo antes de la [Am]sílaba"></textarea>
+      <div class="form-hint">
+        Escribe el acorde entre [corchetes] justo antes de la sílaba donde suena.<br>
+        Usa [Verso], [Estribillo], [Puente], [Intro] para las secciones.
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Tablatura (opcional)</label>
+      <textarea id="newTab" placeholder="e|---0---2---3---2---0---|
+B|---1---3---3---3---1---|
+G|---0---2---0---2---0---|
+D|---2---0---0---0---2---|
+A|---3-------2-------3---|
+E|-----------------------|" style="min-height: 120px;"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-modal primary" onclick="saveSong()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import La Cuerda Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h2>Importar de La Cuerda</h2>
+
+    <div style="background:rgba(139,46,15,0.07);border:1px solid var(--staff-line);border-radius:6px;padding:0.8rem 1rem;margin-bottom:1rem;font-size:0.78rem;color:var(--ink-muted);line-height:1.6;">
+      <strong style="color:var(--accent);">Cómo hacerlo:</strong><br>
+      1. Ve a <a href="https://lacuerda.net" target="_blank" style="color:var(--accent);">lacuerda.net</a> y busca tu canción<br>
+      2. Selecciona todo el texto de la canción (Ctrl+A o selección manual)<br>
+      3. Cópialo y pégalo aquí abajo<br>
+      4. Rellena título y artista, y listo
+    </div>
+
+    <div class="form-group">
+      <label>Título</label>
+      <input type="text" id="impTitle" placeholder="Nombre de la canción">
+    </div>
+    <div class="form-group">
+      <label>Artista</label>
+      <input type="text" id="impArtist" placeholder="Nombre del artista">
+    </div>
+    <div class="form-group">
+      <label>Tonalidad</label>
+      <select id="impKey">
+        <option>Am</option><option>Em</option><option>Dm</option>
+        <option>C</option><option>G</option><option>D</option>
+        <option>F</option><option>E</option><option>A</option>
+        <option>Bm</option><option>F#m</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Pega aquí el texto copiado de La Cuerda</label>
+      <textarea id="impRaw" style="min-height:200px;font-family:var(--font-mono);font-size:0.78rem;" placeholder="Pega aquí el texto tal como está en la web..."></textarea>
+    </div>
+
+    <div id="impPreview" style="display:none;margin-bottom:1rem;">
+      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:0.5rem;">Vista previa</div>
+      <div id="impPreviewText" style="background:rgba(0,0,0,0.04);border:1px solid var(--staff-line);border-radius:4px;padding:0.75rem;font-family:var(--font-mono);font-size:0.75rem;line-height:1.7;max-height:160px;overflow-y:auto;white-space:pre-wrap;color:var(--ink);"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-modal secondary" onclick="closeImport()">Cancelar</button>
+      <button class="btn-modal secondary" onclick="previewImport()">Vista previa</button>
+      <button class="btn-modal primary" onclick="saveImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /appShell -->
+
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, query, where, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── FIREBASE CONFIG ───────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAPXAU79_3DrG1ut1-bTVoX_q0GIPFVcAM",
+  authDomain: "cancioner.firebaseapp.com",
+  projectId: "cancioner",
+  storageBucket: "cancioner.firebasestorage.app",
+  messagingSenderId: "646961823765",
+  appId: "1:646961823765:web:b9f3dbbf83e8598bd70e1c"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+let currentUser = null;
+
+// ── AUTH UI ───────────────────────────────────────────────────────────────
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+}
+
+function showAppShell() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display = 'block';
+  document.getElementById('userAvatar').src = currentUser.photoURL || '';
+  document.getElementById('userAvatar').title = currentUser.displayName || currentUser.email;
+}
+
+window.loginWithGoogle = async function() {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    console.error(e);
+    alert('Error al iniciar sesión: ' + e.message);
+  }
+};
+
+window.logout = async function() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  await signOut(auth);
+};
+
+onAuthStateChanged(auth, async user => {
+  currentUser = user;
+  if (user) {
+    showAppShell();
+    await loadSongsFromFirebase();
+  } else {
+    showLoginScreen();
+    songs = [];
+    currentSong = null;
+  }
+});
+
+// ── FIRESTORE ─────────────────────────────────────────────────────────────
+async function loadSongsFromFirebase() {
+  if (!currentUser) return;
+  try {
+    const q = query(
+      collection(db, 'songs'),
+      where('uid', '==', currentUser.uid),
+      orderBy('createdAt', 'asc')
+    );
+    const snap = await getDocs(q);
+    songs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+    renderSidebar();
+    if (songs.length > 0) {
+      currentSong = songs[0];
+      renderSong();
+    } else {
+      document.getElementById('mainContent').innerHTML = `<div class="empty-state">
+        <h2>Tu cancionero está vacío</h2>
+        <p>Añade tu primera canción para empezar</p>
+        <button class="btn btn-accent" style="padding:0.7rem 1.5rem;font-size:1rem;border-radius:6px;" onclick="openAddSong()">+ Canción</button>
+      </div>`;
+    }
+  } catch(e) {
+    console.error('Error cargando canciones:', e);
+    alert('Error al cargar canciones. Revisa la consola.');
+  }
+}
+
+window.saveAll = async function(song) {
+  if (!currentUser || !song) return;
+  try {
+    const ref = doc(db, 'songs', String(song.id));
+    await setDoc(ref, { ...song, uid: currentUser.uid });
+  } catch(e) {
+    console.error('Error guardando:', e);
+    alert('Error al guardar la canción.');
+  }
+};
+
+window.deleteSongFromDB = async function(id) {
+  if (!currentUser) return;
+  try {
+    await deleteDoc(doc(db, 'songs', String(id)));
+  } catch(e) {
+    console.error('Error borrando:', e);
+  }
+};
+
+// ── DATA ──────────────────────────────────────────────────────────────────
+</script><!-- /firebase module -->
+
+<script>
+// ── DATA (script clásico, accede a window.saveAll y window.deleteSongFromDB) ─
+
+const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NOTE_ALT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+
+// Chord voicings: [string6..string1], -1 = muted, 0 = open
+const CHORD_VOICINGS = {
+  'Am': [0,0,2,2,1,0],  'A': [-1,0,2,2,2,0],
+  'C':  [-1,3,2,0,1,0], 'Cadd9': [-1,3,2,0,3,3],
+  'D':  [-1,-1,0,2,3,2],'Dm': [-1,-1,0,2,3,1],
+  'E':  [0,2,2,1,0,0],  'Em': [0,2,2,0,0,0],
+  'F':  [1,3,3,2,1,1],  'Fm': [1,3,3,1,1,1],
+  'G':  [3,2,0,0,0,3],  'Gm': [3,5,5,3,3,3],
+  'Bm': [-1,2,4,4,3,2], 'B':  [-1,2,4,4,4,2],
+  'F#m':[-1,-1,4,2,2,2],'F#': [2,4,4,3,2,2],
+  'A7': [-1,0,2,0,2,0], 'E7': [0,2,0,1,0,0],
+  'G7': [3,2,0,0,0,1],  'D7': [-1,-1,0,2,1,2],
+};
+
+let songs = [];
+let currentSong = null;
+let transposeAmount = 0;
+let showChordsMode = true;
+let showTabMode = false;
+
+// ── STORAGE ───────────────────────────────────────────────────────────────
+// saveAll y deleteSongFromDB están definidos en el módulo Firebase de arriba
+
+// ── TRANSPOSE ─────────────────────────────────────────────────────────────
+function normalizeNote(n) { return NOTES.includes(n) ? n : NOTE_ALT.includes(n) ? NOTES[NOTE_ALT.indexOf(n)] : n; }
+function transposeChord(chord, steps) {
+  // Handle complex chords: Am7, F#m, Cadd9, etc.
+  const match = chord.match(/^([A-G][#b]?)(.*)/);
+  if (!match) return chord;
+  const root = normalizeNote(match[1]);
+  const idx = NOTES.indexOf(root);
+  if (idx === -1) return chord;
+  const newIdx = ((idx + steps) % 12 + 12) % 12;
+  return NOTES[newIdx] + match[2];
+}
+
+function transpose(delta) {
+  transposeAmount += delta;
+  renderSong();
+  document.querySelectorAll('.toolbar .btn').forEach(b => b.classList.remove('active'));
+}
+
+function resetTranspose() {
+  transposeAmount = 0;
+  renderSong();
+}
+
+// ── PARSE LYRICS ──────────────────────────────────────────────────────────
+function parseLyrics(text) {
+  const lines = text.split('\n');
+  const result = [];
+  for (const line of lines) {
+    // Section header
+    if (/^\[([A-ZÁÉÍÓÚ][a-záéíóúñ]*)\]$/.test(line.trim())) {
+      const sec = line.trim().replace(/[\[\]]/g,'');
+      // Heuristic: section headers are single words starting uppercase in brackets
+      const isSection = ['Intro','Verso','Estribillo','Puente','Chorus','Verse','Bridge','Outro','Coda','Solo','Pre-chorus','Prechorus'].some(s => sec.toLowerCase().includes(s.toLowerCase()));
+      if (isSection) { result.push({type:'section', label: sec}); continue; }
+    }
+    // Parse chords within line
+    const tokens = [];
+    const regex = /\[([A-G][#b]?[^[\]]*)\]([^[]*)/g;
+    let lastIndex = 0, match;
+    // Check if line has any chords
+    if (/\[[A-G]/.test(line)) {
+      // Leading text before first chord
+      const firstChord = line.search(/\[[A-G]/);
+      if (firstChord > 0) tokens.push({chord:'', text: line.slice(0, firstChord)});
+      while ((match = regex.exec(line)) !== null) {
+        tokens.push({chord: match[1], text: match[2]});
+        lastIndex = regex.lastIndex;
+      }
+      result.push({type: 'chords', tokens});
+    } else if (line.trim() === '') {
+      result.push({type: 'empty'});
+    } else {
+      result.push({type: 'text', text: line});
+    }
+  }
+  return result;
+}
+
+function extractChords(song) {
+  const chords = new Set();
+  const lines = parseLyrics(song.lyrics || '');
+  for (const line of lines) {
+    if (line.type === 'chords') {
+      for (const t of line.tokens) {
+        if (t.chord) chords.add(transposeChord(t.chord, transposeAmount));
+      }
+    }
+  }
+  return [...chords];
+}
+
+// ── DRAW CHORD DIAGRAM ────────────────────────────────────────────────────
+function drawChord(canvas, chordName, smallSize = false) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const voicing = CHORD_VOICINGS[chordName];
+  if (!voicing) {
+    ctx.fillStyle = '#888';
+    ctx.font = '10px Lato';
+    ctx.textAlign = 'center';
+    ctx.fillText(chordName, W/2, H/2);
+    return;
+  }
+
+  const strings = 6, frets = 4;
+  const PAD_L = 12, PAD_T = 12, PAD_R = 8, PAD_B = 10;
+  const gw = W - PAD_L - PAD_R;
+  const gh = H - PAD_T - PAD_B;
+  const sw = gw / (strings - 1);
+  const fh = gh / frets;
+
+  // Nut
+  ctx.fillStyle = '#1a1208';
+  ctx.fillRect(PAD_L - 1, PAD_T, gw + 2, 3);
+
+  // Grid
+  ctx.strokeStyle = '#c0a878';
+  ctx.lineWidth = 0.8;
+  for (let s = 0; s < strings; s++) {
+    ctx.beginPath();
+    ctx.moveTo(PAD_L + s * sw, PAD_T);
+    ctx.lineTo(PAD_L + s * sw, PAD_T + gh);
+    ctx.stroke();
+  }
+  for (let f = 0; f <= frets; f++) {
+    ctx.beginPath();
+    ctx.moveTo(PAD_L, PAD_T + f * fh);
+    ctx.lineTo(PAD_L + gw, PAD_T + f * fh);
+    ctx.stroke();
+  }
+
+  // Dots
+  for (let s = 0; s < strings; s++) {
+    const fret = voicing[strings - 1 - s];
+    const x = PAD_L + s * sw;
+    if (fret === -1) {
+      // Muted
+      ctx.strokeStyle = '#8b2e0f'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x-4, PAD_T-8); ctx.lineTo(x+4, PAD_T-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+4, PAD_T-8); ctx.lineTo(x-4, PAD_T-2); ctx.stroke();
+    } else if (fret === 0) {
+      // Open
+      ctx.strokeStyle = '#1a1208'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, PAD_T - 5, 3.5, 0, Math.PI*2);
+      ctx.stroke();
+    } else {
+      // Fret dot
+      ctx.fillStyle = '#8b2e0f';
+      ctx.beginPath();
+      ctx.arc(x, PAD_T + (fret - 0.5) * fh, fh * 0.32, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function renderSong() {
+  const el = document.getElementById('mainContent');
+  if (!currentSong) {
+    el.innerHTML = `<div class="empty-state">
+      <h2>Tu cancionero está vacío</h2>
+      <p>Añade tu primera canción para empezar</p>
+      <button class="btn btn-accent" style="padding:0.7rem 1.5rem;font-size:1rem;border-radius:6px;" onclick="openAddSong()">+ Añadir canción</button>
+    </div>`;
+    return;
+  }
+
+  const song = currentSong;
+  const allChords = extractChords(song);
+  const lines = parseLyrics(song.lyrics || '');
+  const tKey = transposeChord(song.key, transposeAmount);
+  const tLabel = transposeAmount !== 0 ? ` <span style="color:var(--accent-light);font-size:0.7rem;">[${transposeAmount>0?'+':''}${transposeAmount} semitonos]</span>` : '';
+
+  // Build chord diagrams HTML
+  let chordsHTML = '';
+  if (showChordsMode) {
+    chordsHTML = `<div class="chord-diagrams" id="chordDiagramsRow">
+      ${allChords.map(c => `
+        <div class="chord-diagram" id="cd-${c}" 
+          onmouseover="showTooltip(event,'${c}')" 
+          onmouseout="hideTooltip()"
+          ontouchstart="showTooltip(event,'${c}')">
+          <div class="chord-name">${c}</div>
+          <canvas id="canvas-${c}" width="56" height="70"></canvas>
+        </div>`).join('')}
+    </div>`;
+  }
+
+  // Build lyrics HTML
+  let lyricsHTML = '';
+  for (const line of lines) {
+    if (line.type === 'section') {
+      lyricsHTML += `<div class="section-label">${line.label}</div>`;
+    } else if (line.type === 'empty') {
+      lyricsHTML += `<div style="height:0.6em"></div>`;
+    } else if (line.type === 'text') {
+      lyricsHTML += `<div class="lyric-line">${line.text}</div>`;
+    } else if (line.type === 'chords') {
+      lyricsHTML += `<div class="chord-line">`;
+      for (const t of line.tokens) {
+        const chord = t.chord ? transposeChord(t.chord, transposeAmount) : '';
+        lyricsHTML += `<span class="chord-word">
+          <span class="chord-label">${chord}</span>
+          <span class="chord-text">${t.text || ' '}</span>
+        </span>`;
+      }
+      lyricsHTML += `</div>`;
+    }
+  }
+
+  // Tab section
+  const tabHTML = song.tab ? `<div class="tab-section ${showTabMode?'visible':''}" id="tabSection">
+    <div class="tab-title">Tablatura</div>
+    <div class="tab-block">${formatTab(song.tab)}</div>
+  </div>` : '';
+
+  el.innerHTML = `
+  <div class="paper-card">
+    <div class="card-content">
+      <div class="song-header">
+        <div>
+          <div class="song-title">${song.title}</div>
+          <div class="song-artist-display">${song.artist}</div>
+        </div>
+        <div class="song-meta">
+          <strong>${tKey}</strong>
+          Tonalidad${tLabel}
+          <button onclick="deleteSong(${song.id})" style="display:block;margin-top:0.5rem;background:none;border:1px solid #ccc;border-radius:3px;padding:0.2rem 0.5rem;font-size:0.65rem;cursor:pointer;color:var(--ink-muted);">Eliminar</button>
+        </div>
+      </div>
+
+      <div class="controls-bar">
+        <div class="control-group">
+          <span class="control-label">Tamaño</span>
+          <button class="ctrl-btn" onclick="changeSize(-1)">−</button>
+          <span class="ctrl-value" id="sizeVal">${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--font-size'))}px</span>
+          <button class="ctrl-btn" onclick="changeSize(1)">+</button>
+        </div>
+        <div class="control-group">
+          <span class="control-label">Tono</span>
+          <button class="ctrl-btn" onclick="transpose(-1)">♭</button>
+          <span class="ctrl-value">${transposeAmount > 0 ? '+' : ''}${transposeAmount}</span>
+          <button class="ctrl-btn" onclick="transpose(1)">♯</button>
+        </div>
+        <button class="ctrl-btn" style="padding:0 8px;width:auto;" onclick="window.print()">⎙ Imprimir</button>
+      </div>
+
+      ${chordsHTML}
+      ${tabHTML}
+      <div class="lyrics-section" id="lyricsSection">${lyricsHTML}</div>
+    </div>
+  </div>`;
+
+  // Draw chord canvases
+  if (showChordsMode) {
+    requestAnimationFrame(() => {
+      for (const c of allChords) {
+        const canvas = document.getElementById(`canvas-${c}`);
+        if (canvas) drawChord(canvas, c);
+      }
+    });
+  }
+
+  // Update sidebar active
+  document.querySelectorAll('#songList li').forEach(li => {
+    li.classList.toggle('active', parseInt(li.dataset.id) === song.id);
+  });
+}
+
+function formatTab(tab) {
+  return tab.replace(/([eEBGDAd])\|/g, '<span class="tab-string-name">$1|</span>')
+            .replace(/\b([0-9]{1,2})\b/g, '<span class="tab-fret-num">$1</span>');
+}
+
+// ── CONTROLS ──────────────────────────────────────────────────────────────
+function changeSize(delta) {
+  const root = document.documentElement;
+  const current = parseInt(getComputedStyle(root).getPropertyValue('--font-size')) || 16;
+  const next = Math.max(12, Math.min(24, current + delta));
+  root.style.setProperty('--font-size', next + 'px');
+  document.getElementById('sizeVal').textContent = next + 'px';
+}
+
+function toggleChords() {
+  showChordsMode = !showChordsMode;
+  document.getElementById('btn-chords').classList.toggle('active', showChordsMode);
+  renderSong();
+}
+
+function toggleTab() {
+  showTabMode = !showTabMode;
+  document.getElementById('btn-tab').classList.toggle('active', showTabMode);
+  const tab = document.getElementById('tabSection');
+  if (tab) tab.classList.toggle('visible', showTabMode);
+}
+
+// ── TOOLTIP ───────────────────────────────────────────────────────────────
+function showTooltip(e, chord) {
+  const tip = document.getElementById('chordTooltip');
+  document.getElementById('tooltipName').textContent = chord;
+  const c = document.getElementById('tooltipCanvas');
+  drawChord(c, chord);
+  tip.classList.add('visible');
+  const r = e.target.closest('.chord-diagram').getBoundingClientRect();
+  tip.style.left = Math.min(r.left, window.innerWidth - 160) + 'px';
+  tip.style.top = (r.bottom + 8) + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('chordTooltip').classList.remove('visible');
+}
+
+// ── SONG LIST ─────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('songList');
+  list.innerHTML = songs.map(s => `
+    <li data-id="${s.id}" onclick="selectSong(${s.id})">
+      <span class="song-name">${s.title}</span>
+      <span class="song-artist">${s.artist}</span>
+    </li>`).join('');
+}
+
+function selectSong(id) {
+  currentSong = songs.find(s => s.id === id);
+  transposeAmount = 0;
+  renderSong();
+  renderSidebar();
+}
+
+function deleteSong(id) {
+  if (!confirm('¿Eliminar esta canción?')) return;
+  songs = songs.filter(s => s.id !== id);
+  deleteSongFromDB(id);
+  currentSong = songs[0] || null;
+  renderSidebar();
+  renderSong();
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────
+function openAddSong() {
+  document.getElementById('addSongModal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('addSongModal').classList.remove('visible');
+}
+
+function saveSong() {
+  const title = document.getElementById('newTitle').value.trim();
+  const artist = document.getElementById('newArtist').value.trim();
+  const key = document.getElementById('newKey').value;
+  const lyrics = document.getElementById('newLyrics').value;
+  const tab = document.getElementById('newTab').value;
+
+  if (!title) { alert('El título es obligatorio'); return; }
+
+  const newSong = {
+    id: String(Date.now()),
+    title,
+    artist: artist || 'Desconocido',
+    key,
+    lyrics,
+    tab,
+    createdAt: Date.now()
+  };
+  songs.push(newSong);
+  saveAll(newSong);
+  currentSong = newSong;
+  renderSidebar();
+  renderSong();
+  closeModal();
+
+  ['newTitle','newArtist','newLyrics','newTab'].forEach(id => document.getElementById(id).value = '');
+}
+
+// Close modal on overlay click
+document.getElementById('addSongModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ── IMPORTAR DE LA CUERDA ─────────────────────────────────────────────────
+
+function openImport() {
+  document.getElementById('importModal').classList.add('visible');
+  document.getElementById('impPreview').style.display = 'none';
+}
+
+function closeImport() {
+  document.getElementById('importModal').classList.remove('visible');
+  document.getElementById('impRaw').value = '';
+  document.getElementById('impPreviewText').textContent = '';
+  document.getElementById('impPreview').style.display = 'none';
+}
+
+/*
+  Parser de La Cuerda:
+  El formato tiene líneas de acordes (solo texto azul/mayúsculas con posiciones)
+  alternadas con líneas de letra. Los acordes están desplazados horizontalmente
+  indicando sobre qué sílaba caen.
+
+  Estrategia:
+  1. Detectar si una línea es "de acordes": contiene solo tokens que son acordes
+     válidos separados por espacios, sin letras de texto normal.
+  2. Para cada par (línea_acordes, línea_letra): calcular la posición de cada
+     acorde y encontrar la sílaba correspondiente en la línea de letra.
+  3. Insertar el acorde [X] justo antes de esa sílaba.
+*/
+
+const CHORD_RE = /^[A-G][#b]?(m|maj|min|aug|dim|sus|add|M)?[0-9]?(\/[A-G][#b]?)?$/;
+
+function isChordToken(t) {
+  return CHORD_RE.test(t.trim());
+}
+
+function isChordLine(line) {
+  if (!line.trim()) return false;
+  // La línea de acordes en La Cuerda suele tener solo acordes y espacios
+  const tokens = line.trim().split(/\s+/);
+  if (tokens.length === 0) return false;
+  // Al menos un token debe ser acorde y NINGUNO debe ser texto normal largo
+  const chordCount = tokens.filter(isChordToken).length;
+  const nonChord = tokens.filter(t => !isChordToken(t));
+  // Si hay texto que no es acorde y es largo, no es línea de acordes
+  if (nonChord.some(t => t.length > 3 && !isChordToken(t))) return false;
+  return chordCount > 0 && chordCount === tokens.length;
+}
+
+function isSectionLine(line) {
+  const t = line.trim();
+  const SECTIONS = ['intro','verso','estribillo','chorus','puente','bridge','solo','coda','outro','pre-estribillo','final','refrain'];
+  // Entre paréntesis o corchetes, o línea sola con esa palabra
+  return SECTIONS.some(s => t.toLowerCase().replace(/[\[\]()]/g,'').trim() === s);
+}
+
+function mergeChordAndLyric(chordLine, lyricLine) {
+  // Encontrar posición de cada acorde en la línea de acordes
+  const chords = [];
+  const re = /\S+/g;
+  let m;
+  while ((m = re.exec(chordLine)) !== null) {
+    if (isChordToken(m[0])) {
+      chords.push({ chord: m[0], pos: m.index });
+    }
+  }
+
+  if (chords.length === 0) return lyricLine;
+
+  // Insertar acordes en la línea de letra según posición de carácter
+  // Trabajamos con array de chars para mantener posiciones
+  let result = '';
+  let lyric = lyricLine;
+  let offset = 0; // cuántos chars hemos añadido (corchetes)
+
+  // Ordenar por posición
+  chords.sort((a, b) => a.pos - b.pos);
+
+  for (const { chord, pos } of chords) {
+    // La posición en la letra original (sin los corchetes añadidos)
+    // Intentamos insertar en la posición más cercana que no parta una palabra
+    let insertAt = Math.min(pos, lyric.length);
+
+    // Si caemos en medio de una palabra, retrocedemos al inicio de esa palabra
+    // (para no cortar "bai-lando" en dos)
+    while (insertAt > 0 && lyric[insertAt - 1] && lyric[insertAt - 1] !== ' ') {
+      // Solo retrocedemos si el acorde está muy cerca del inicio de la palabra
+      // Si la posición original ya apunta a un espacio o inicio, no mover
+      if (pos <= insertAt - 1) insertAt--;
+      else break;
+    }
+
+    const tag = `[${chord}]`;
+    lyric = lyric.slice(0, insertAt) + tag + lyric.slice(insertAt);
+    // Ajustamos futuras posiciones
+    // (no necesario porque trabajamos con posición original relativa)
+  }
+
+  return lyric;
+}
+
+function parseLaCuerda(raw) {
+  const lines = raw.split('\n');
+  const output = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Línea vacía
+    if (!trimmed) {
+      output.push('');
+      i++;
+      continue;
+    }
+
+    // Sección tipo (Estribillo), [Verso], etc.
+    if (isSectionLine(trimmed)) {
+      const label = trimmed.replace(/[\[\]()]/g, '').trim();
+      // Capitalizar primera letra
+      output.push('[' + label.charAt(0).toUpperCase() + label.slice(1) + ']');
+      i++;
+      continue;
+    }
+
+    // Línea de acordes seguida de línea de letra
+    if (isChordLine(line) && i + 1 < lines.length) {
+      const nextLine = lines[i + 1];
+      if (!isChordLine(nextLine) && nextLine.trim()) {
+        // Fusionar acorde + letra
+        output.push(mergeChordAndLyric(line, nextLine));
+        i += 2;
+        continue;
+      }
+    }
+
+    // Línea de acordes sola (sin letra debajo, p.ej. intro instrumental)
+    if (isChordLine(line)) {
+      const tokens = line.trim().split(/\s+/).filter(isChordToken);
+      output.push(tokens.map(c => `[${c}]`).join('  '));
+      i++;
+      continue;
+    }
+
+    // Línea de letra sola (sin acordes encima)
+    output.push(trimmed);
+    i++;
+  }
+
+  // Limpiar líneas vacías consecutivas
+  return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function previewImport() {
+  const raw = document.getElementById('impRaw').value;
+  if (!raw.trim()) { alert('Pega primero el texto de La Cuerda'); return; }
+  const converted = parseLaCuerda(raw);
+  document.getElementById('impPreviewText').textContent = converted;
+  document.getElementById('impPreview').style.display = 'block';
+}
+
+function saveImport() {
+  const title = document.getElementById('impTitle').value.trim();
+  const artist = document.getElementById('impArtist').value.trim();
+  const key = document.getElementById('impKey').value;
+  const raw = document.getElementById('impRaw').value;
+
+  if (!title) { alert('Pon el título de la canción'); return; }
+  if (!raw.trim()) { alert('Pega el texto de La Cuerda'); return; }
+
+  const lyrics = parseLaCuerda(raw);
+
+  const newSong = {
+    id: String(Date.now()),
+    title,
+    artist: artist || 'Desconocido',
+    key,
+    lyrics,
+    tab: '',
+    createdAt: Date.now()
+  };
+
+  songs.push(newSong);
+  saveAll(newSong);
+  currentSong = newSong;
+  renderSidebar();
+  renderSong();
+  closeImport();
+
+  // Limpiar campos
+  ['impTitle','impArtist','impRaw'].forEach(id => document.getElementById(id).value = '');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+// La carga inicial la gestiona onAuthStateChanged en el módulo Firebase
+
+// ── MODO MÓVIL ────────────────────────────────────────────────────────────
+let mobileMode = false;
+
+function isMobileDevice() {
+  return /Mobi|Android|iPhone|iPad|iPod|Touch/i.test(navigator.userAgent)
+    || window.innerWidth < 700
+    || ('ontouchstart' in window && window.innerWidth < 1024);
+}
+
+function applyMobileMode(enable) {
+  mobileMode = enable;
+  document.body.classList.toggle('mobile', enable);
+  document.getElementById('btn-mobile').classList.toggle('active', enable);
+  document.getElementById('btn-mobile').textContent = enable ? '🖥️' : '📱';
+  document.getElementById('btn-mobile').title = enable ? 'Modo escritorio' : 'Modo móvil';
+  document.getElementById('btn-songs-panel').style.display = enable ? '' : 'none';
+  localStorage.setItem('cancionero_mobileMode', enable ? '1' : '0');
+  renderSong();
+}
+
+function toggleMobileMode() {
+  applyMobileMode(!mobileMode);
+}
+
+function openSongPanel() {
+  const panel = document.getElementById('mobileSongPanel');
+  const list = document.getElementById('songListMobile');
+  list.innerHTML = songs.map(s => `
+    <li data-id="${s.id}" onclick="selectSong(${s.id});closeSongPanel();">
+      <span class="song-name">${s.title}</span>
+      <span class="song-artist">${s.artist}</span>
+    </li>`).join('');
+  // Marcar activa
+  list.querySelectorAll('li').forEach(li => {
+    li.classList.toggle('active', currentSong && parseInt(li.dataset.id) === currentSong.id);
+  });
+  panel.classList.add('visible');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSongPanel() {
+  document.getElementById('mobileSongPanel').classList.remove('visible');
+  document.body.style.overflow = '';
+}
+
+// Detectar automáticamente al cargar
+(function() {
+  const saved = localStorage.getItem('cancionero_mobileMode');
+  const shouldMobile = saved !== null ? saved === '1' : isMobileDevice();
+  if (shouldMobile) applyMobileMode(true);
+})();
+
+// Re-detectar si cambia el tamaño de ventana (p.ej. girar el móvil)
+window.addEventListener('resize', () => {
+  if (localStorage.getItem('cancionero_mobileMode') === null) {
+    applyMobileMode(isMobileDevice());
+  }
+});
+</script>
+</body>
+</html>
