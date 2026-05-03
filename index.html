@@ -586,16 +586,16 @@
   body.mobile .chord-diagrams { overflow-x: scroll; }
 
   /* Lista de canciones en móvil: panel deslizante */
-  body.mobile .mobile-song-panel {
-    display: flex !important;
-  }
-
   .mobile-song-panel {
     display: none;
     position: fixed;
     inset: 0;
     z-index: 200;
     background: rgba(0,0,0,0.6);
+  }
+
+  .mobile-song-panel.visible {
+    display: flex;
   }
 
   .mobile-song-panel-inner {
