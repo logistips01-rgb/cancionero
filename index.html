@@ -854,9 +854,11 @@ async function loadSongsFromFirebase() {
     const snap = await getDocs(q);
     songs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
     renderSidebar();
+    // Seleccionar primera canción automáticamente
     if (songs.length > 0) {
       currentSong = songs[0];
-      renderSong();
+      // Esperar a que el DOM del appShell esté visible antes de renderizar
+      requestAnimationFrame(() => renderSong());
     } else {
       document.getElementById('mainContent').innerHTML = `<div class="empty-state">
         <h2>Tu cancionero está vacío</h2>
@@ -1498,6 +1500,8 @@ function applyMobileMode(enable) {
   document.getElementById('btn-mobile').title = enable ? 'Modo escritorio' : 'Modo móvil';
   document.getElementById('btn-songs-panel').style.display = enable ? '' : 'none';
   localStorage.setItem('cancionero_mobileMode', enable ? '1' : '0');
+  // En escritorio restaurar overflow por si quedó bloqueado
+  if (!enable) document.body.style.overflow = '';
   renderSong();
 }
 
