@@ -1509,14 +1509,18 @@ function isMobileDevice() {
 function applyMobileMode(enable) {
   mobileMode = enable;
   document.body.classList.toggle('mobile', enable);
-  document.getElementById('btn-mobile').classList.toggle('active', enable);
-  document.getElementById('btn-mobile').textContent = enable ? '🖥️' : '📱';
-  document.getElementById('btn-mobile').title = enable ? 'Modo escritorio' : 'Modo móvil';
-  document.getElementById('btn-songs-panel').style.display = enable ? '' : 'none';
+  const btn = document.getElementById('btn-mobile');
+  const panelBtn = document.getElementById('btn-songs-panel');
+  if (btn) {
+    btn.classList.toggle('active', enable);
+    btn.textContent = enable ? '🖥️' : '📱';
+    btn.title = enable ? 'Modo escritorio' : 'Modo móvil';
+  }
+  if (panelBtn) panelBtn.style.display = enable ? '' : 'none';
   localStorage.setItem('cancionero_mobileMode', enable ? '1' : '0');
-  // En escritorio restaurar overflow por si quedó bloqueado
   if (!enable) document.body.style.overflow = '';
-  renderSong();
+  // Solo renderizar si ya hay canciones cargadas
+  if (currentSong) renderSong();
 }
 
 function toggleMobileMode() {
@@ -1527,13 +1531,12 @@ function openSongPanel() {
   const panel = document.getElementById('mobileSongPanel');
   const list = document.getElementById('songListMobile');
   list.innerHTML = songs.map(s => `
-    <li data-id="${s.id}" onclick="selectSong(${s.id});closeSongPanel();">
+    <li data-id="${s.id}" onclick="selectSong('${s.id}');closeSongPanel();">
       <span class="song-name">${s.title}</span>
       <span class="song-artist">${s.artist}</span>
     </li>`).join('');
-  // Marcar activa
   list.querySelectorAll('li').forEach(li => {
-    li.classList.toggle('active', currentSong && parseInt(li.dataset.id) === currentSong.id);
+    li.classList.toggle('active', currentSong && String(li.dataset.id) === String(currentSong.id));
   });
   panel.classList.add('visible');
   document.body.style.overflow = 'hidden';
@@ -1544,14 +1547,19 @@ function closeSongPanel() {
   document.body.style.overflow = '';
 }
 
-// Detectar automáticamente al cargar
+// Detectar automáticamente al cargar — pero sin renderizar todavía
 (function() {
   const saved = localStorage.getItem('cancionero_mobileMode');
   const shouldMobile = saved !== null ? saved === '1' : isMobileDevice();
-  if (shouldMobile) applyMobileMode(true);
+  if (shouldMobile) {
+    mobileMode = true;
+    document.body.classList.add('mobile');
+    // Actualizar botones cuando el DOM esté listo
+    window.addEventListener('DOMContentLoaded', () => applyMobileMode(true));
+  }
 })();
 
-// Re-detectar si cambia el tamaño de ventana (p.ej. girar el móvil)
+// Re-detectar si cambia el tamaño de ventana
 window.addEventListener('resize', () => {
   if (localStorage.getItem('cancionero_mobileMode') === null) {
     applyMobileMode(isMobileDevice());
