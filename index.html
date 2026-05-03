@@ -506,8 +506,19 @@
   /* ── MODO MÓVIL ── */
   body.mobile {
     --font-size: 19px;
+  }
+
+  body.mobile .layout {
+    height: calc(100dvh - 50px);
     overflow: hidden;
-    height: 100dvh;
+  }
+
+  body.mobile .main {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    padding: 0;
+    padding-bottom: 1rem;
   }
 
   body.mobile .site-header {
@@ -1135,8 +1146,11 @@ function renderSong() {
         <div class="song-meta">
           <strong>${tKey}</strong>
           Tonalidad${tLabel}
-          <button onclick="deleteSong('${song.id}')" style="display:block;margin-top:0.5rem;background:none;border:1px solid #ccc;border-radius:3px;padding:0.2rem 0.5rem;font-size:0.65rem;cursor:pointer;color:var(--ink-muted);">Eliminar</button>
         </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+        <button onclick="deleteSong('${song.id}')" style="background:none;border:1px solid rgba(180,30,30,0.35);border-radius:4px;padding:0.3rem 0.8rem;font-size:0.75rem;cursor:pointer;color:#c82020;font-family:var(--font-body);transition:all 0.15s;" onmouseover="this.style.background='rgba(180,30,30,0.08)'" onmouseout="this.style.background='none'">🗑 Eliminar canción</button>
       </div>
 
       <div class="controls-bar">
