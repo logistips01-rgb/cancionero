@@ -669,8 +669,8 @@
   </div>
 </div>
 
-<div class="layout">
-  <aside class="sidebar">
+<div class="layout" id="appLayout">
+  <aside class="sidebar" id="appSidebar">
     <h3>Canciones</h3>
     <ul class="song-list" id="songList"></ul>
     <button class="add-song-btn" onclick="openAddSong()">
@@ -1509,6 +1509,13 @@ function isMobileDevice() {
 function applyMobileMode(enable) {
   mobileMode = enable;
   document.body.classList.toggle('mobile', enable);
+
+  // Controlar sidebar directamente — sin depender del CSS
+  const sidebar = document.getElementById('appSidebar');
+  const layout = document.getElementById('appLayout');
+  if (sidebar) sidebar.style.display = enable ? 'none' : '';
+  if (layout) layout.style.gridTemplateColumns = enable ? '1fr' : '';
+
   const btn = document.getElementById('btn-mobile');
   const panelBtn = document.getElementById('btn-songs-panel');
   if (btn) {
@@ -1519,7 +1526,6 @@ function applyMobileMode(enable) {
   if (panelBtn) panelBtn.style.display = enable ? '' : 'none';
   localStorage.setItem('cancionero_mobileMode', enable ? '1' : '0');
   if (!enable) document.body.style.overflow = '';
-  // Solo renderizar si ya hay canciones cargadas
   if (currentSong) renderSong();
 }
 
