@@ -1135,7 +1135,7 @@ function renderSong() {
         <div class="song-meta">
           <strong>${tKey}</strong>
           Tonalidad${tLabel}
-          <button onclick="deleteSong(${song.id})" style="display:block;margin-top:0.5rem;background:none;border:1px solid #ccc;border-radius:3px;padding:0.2rem 0.5rem;font-size:0.65rem;cursor:pointer;color:var(--ink-muted);">Eliminar</button>
+          <button onclick="deleteSong('${song.id}')" style="display:block;margin-top:0.5rem;background:none;border:1px solid #ccc;border-radius:3px;padding:0.2rem 0.5rem;font-size:0.65rem;cursor:pointer;color:var(--ink-muted);">Eliminar</button>
         </div>
       </div>
 
@@ -1173,7 +1173,7 @@ function renderSong() {
 
   // Update sidebar active
   document.querySelectorAll('#songList li').forEach(li => {
-    li.classList.toggle('active', parseInt(li.dataset.id) === song.id);
+    li.classList.toggle('active', String(li.dataset.id) === String(song.id));
   });
 }
 
@@ -1224,14 +1224,14 @@ function hideTooltip() {
 function renderSidebar() {
   const list = document.getElementById('songList');
   list.innerHTML = songs.map(s => `
-    <li data-id="${s.id}" onclick="selectSong(${s.id})">
+    <li data-id="${s.id}" onclick="selectSong('${s.id}')">
       <span class="song-name">${s.title}</span>
       <span class="song-artist">${s.artist}</span>
     </li>`).join('');
 }
 
 function selectSong(id) {
-  currentSong = songs.find(s => s.id === id);
+  currentSong = songs.find(s => String(s.id) === String(id));
   transposeAmount = 0;
   renderSong();
   renderSidebar();
@@ -1239,8 +1239,8 @@ function selectSong(id) {
 
 function deleteSong(id) {
   if (!confirm('¿Eliminar esta canción?')) return;
-  songs = songs.filter(s => s.id !== id);
-  deleteSongFromDB(id);
+  songs = songs.filter(s => String(s.id) !== String(id));
+  deleteSongFromDB(String(id));
   currentSong = songs[0] || null;
   renderSidebar();
   renderSong();
