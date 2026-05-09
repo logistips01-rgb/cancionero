@@ -823,13 +823,7 @@ E|-----------------------|" style="min-height: 120px;"></textarea>
     <!-- Cuerdas de referencia -->
     <div style="margin-bottom:1.5rem;">
       <div style="font-size:0.65rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-muted);margin-bottom:0.6rem;">Cuerdas estándar (E A D G B e)</div>
-      <div style="display:flex;justify-content:center;gap:0.4rem;flex-wrap:wrap;">
-        ${[['E2','82.4Hz'],['A2','110Hz'],['D3','146.8Hz'],['G3','196Hz'],['B3','246.9Hz'],['E4','329.6Hz']].map(([n,f])=>`
-          <div style="background:rgba(0,0,0,0.05);border:1px solid var(--staff-line);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.7rem;text-align:center;">
-            <div style="font-weight:700;font-family:'Playfair Display',serif;">${n[0]}</div>
-            <div style="color:var(--ink-muted);font-size:0.6rem;">${f}</div>
-          </div>`).join('')}
-      </div>
+      <div style="display:flex;justify-content:center;gap:0.4rem;flex-wrap:wrap;" id="tunerStrings"></div>
     </div>
 
     <div class="modal-actions" style="justify-content:center;">
@@ -1319,6 +1313,18 @@ function detectPitch(buffer, sampleRate) {
 
 async function openTuner() {
   document.getElementById('tunerModal').classList.add('visible');
+
+  // Generar cuerdas de referencia
+  const stringsEl = document.getElementById('tunerStrings');
+  if (stringsEl && !stringsEl.children.length) {
+    [['E','82.4'],['A','110'],['D','146.8'],['G','196'],['B','246.9'],['e','329.6']].forEach(([n,f]) => {
+      stringsEl.innerHTML += `<div style="background:rgba(0,0,0,0.05);border:1px solid var(--staff-line);border-radius:6px;padding:0.3rem 0.5rem;font-size:0.7rem;text-align:center;">
+        <div style="font-weight:700;font-family:'Playfair Display',serif;">${n}</div>
+        <div style="color:var(--ink-muted);font-size:0.6rem;">${f}Hz</div>
+      </div>`;
+    });
+  }
+
   if (tunerActive) return;
   try {
     tunerStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -1328,6 +1334,8 @@ async function openTuner() {
     const source = tunerCtx.createMediaStreamSource(tunerStream);
     source.connect(tunerAnalyser);
     tunerActive = true;
+    document.getElementById('tnStatus').textContent = 'Escuchando…';
+    document.getElementById('tnStatus').style.color = 'var(--ink-muted)';
     tunerLoop();
   } catch(e) {
     document.getElementById('tnStatus').textContent = 'Sin acceso al micrófono';
@@ -1442,25 +1450,25 @@ function stopTeleprompter() {
 function resetTeleprompter() {
   stopTeleprompter();
   tpScrollPos = 0;
-  const main = document.querySelector('.main');
-  if (main) main.scrollTop = 0;
+  const main = document.querySelector('.main') || document.documentElement;
+  main.scrollTop = 0;
 }
 
 function tpTick(timestamp) {
   if (!tpRunning) return;
   if (!tpLastTime) tpLastTime = timestamp;
-  const delta = (timestamp - tpLastTime) / 1000; // segundos
+  const delta = (timestamp - tpLastTime) / 1000;
   tpLastTime = timestamp;
 
-  const main = document.querySelector('.main');
-  if (main) {
-    tpScrollPos += getTpScrollSpeed() * delta;
-    main.scrollTop = tpScrollPos;
-    // Parar si llegamos al final
-    if (main.scrollTop >= main.scrollHeight - main.clientHeight) {
-      stopTeleprompter();
-      return;
-    }
+  // Buscar el contenedor con scroll — .main en escritorio, body/window en móvil
+  const main = document.querySelector('.main') || document.documentElement;
+  tpScrollPos += getTpScrollSpeed() * delta;
+  main.scrollTop = tpScrollPos;
+
+  const maxScroll = main.scrollHeight - main.clientHeight;
+  if (main.scrollTop >= maxScroll - 2) {
+    stopTeleprompter();
+    return;
   }
   tpAnimFrame = requestAnimationFrame(tpTick);
 }
