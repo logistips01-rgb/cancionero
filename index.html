@@ -485,6 +485,7 @@
   .btn-modal.primary:hover { background: var(--accent-light); }
   .btn-modal.secondary { background: rgba(0,0,0,0.08); color: var(--ink); }
   .btn-modal.secondary:hover { background: rgba(0,0,0,0.15); }
+  .btn-modal:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
   /* ── MODO COMPONER ── */
   .compose-header {
@@ -604,6 +605,65 @@
   @media (max-width: 700px) {
     .compose-header { grid-template-columns: 1fr; }
   }
+
+  /* ── MODO PISTAS ── */
+  .tracks-transport {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+
+  .tracks-list { margin: 1rem 0 1.5rem; }
+
+  .track-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--staff-line);
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    background: rgba(0,0,0,0.02);
+    flex-wrap: wrap;
+  }
+
+  .track-name {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--ink);
+    min-width: 90px;
+  }
+
+  .track-volume { accent-color: var(--accent); width: 100px; }
+
+  .track-mute-btn {
+    width: 30px; height: 30px;
+    border: 1px solid var(--staff-line);
+    background: var(--paper);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .track-mute-btn.muted { background: var(--accent); border-color: var(--accent); }
+
+  .track-unsupported {
+    font-size: 0.7rem;
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .recording-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: recording-pulse 1s infinite;
+  }
+  @keyframes recording-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .recording-dot { animation: none; } }
 
   /* ── EMPTY STATE ── */
   .empty-state {
@@ -766,6 +826,7 @@
     <button class="btn" id="btn-chords" onclick="toggleChords()">Acordes</button>
     <button class="btn" id="btn-tab" onclick="toggleTab()">Tablatura</button>
     <button class="btn" id="btn-compose" onclick="toggleCompose()" title="Modo Componer">✎ Componer</button>
+    <button class="btn" id="btn-tracks" onclick="toggleTracks()" title="Modo Pistas">🎙 Pistas</button>
     <div class="sep"></div>
     <button class="btn" onclick="transpose(-1)">♭ −1</button>
     <button class="btn" onclick="transpose(1)">♯ +1</button>
@@ -963,6 +1024,8 @@ import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, query, where
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getFunctions, httpsCallable }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -978,6 +1041,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
+const storage = getStorage(app);
 let currentUser = null;
 
 // ── AUTH UI ───────────────────────────────────────────────────────────────
@@ -1078,6 +1142,25 @@ window.callSuggestLine = async function(payload) {
   return res.data;
 };
 
+// ── STORAGE: pistas de audio (modo Pistas) ────────────────────────────────
+window.uploadTrackFile = async function(songId, trackId, blob, ext) {
+  if (!currentUser) throw new Error('No autenticado');
+  const path = `tracks/${currentUser.uid}/${songId}/${trackId}.${ext}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, blob, { contentType: blob.type });
+  const url = await getDownloadURL(storageRef);
+  return { url, storagePath: path };
+};
+
+window.deleteTrackFile = async function(storagePath) {
+  if (!currentUser || !storagePath) return;
+  try {
+    await deleteObject(ref(storage, storagePath));
+  } catch(e) {
+    console.error('Error borrando pista de Storage:', e);
+  }
+};
+
 // ── DATA ──────────────────────────────────────────────────────────────────
 </script><!-- /firebase module -->
 
@@ -1113,6 +1196,20 @@ let composeSongId = null; // id de la canción cuyas líneas están cargadas en 
 let composeLines = [];
 let composeSuggestions = {}; // idx -> {lyric, chord, nota}
 let composeLoadingIdx = null;
+
+// ── MODO PISTAS ───────────────────────────────────────────────────────────
+let tracksMode = false;
+let recordingState = 'idle'; // 'idle' | 'recording' | 'uploading'
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
+let recordingMimeType = '';
+let recordingStartedAt = null;
+let recordingTimerInterval = null;
+let tracksAudioCtx = null;
+let audioBufferCache = new Map(); // trackId -> AudioBuffer decodificado
+let activeSourceNodes = []; // {source, gain} de la reproducción en curso
+let tracksPlaying = false;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────
 // saveAll y deleteSongFromDB están definidos en el módulo Firebase de arriba
@@ -1273,6 +1370,11 @@ function renderSong() {
     return;
   }
 
+  if (tracksMode) {
+    renderTracksPanel();
+    return;
+  }
+
   const song = currentSong;
   const allChords = extractChords(song);
   const lines = parseLyrics(song.lyrics || '');
@@ -1429,7 +1531,23 @@ function simplifyLine(raw) {
 
 function toggleCompose() {
   composeMode = !composeMode;
+  if (composeMode && tracksMode) {
+    tracksMode = false;
+    document.getElementById('btn-tracks').classList.remove('active');
+    tracksStopAll();
+  }
   document.getElementById('btn-compose').classList.toggle('active', composeMode);
+  renderSong();
+}
+
+function toggleTracks() {
+  tracksMode = !tracksMode;
+  if (tracksMode && composeMode) {
+    composeMode = false;
+    document.getElementById('btn-compose').classList.remove('active');
+  }
+  if (!tracksMode) tracksStopAll();
+  document.getElementById('btn-tracks').classList.toggle('active', tracksMode);
   renderSong();
 }
 
@@ -1447,6 +1565,12 @@ function createBlankSongForCompose() {
   songs.push(newSong);
   currentSong = newSong;
   renderSidebar();
+}
+
+function composeStartBlank() {
+  createBlankSongForCompose();
+  composeSongId = null; // fuerza recarga de composeLines para la nueva canción vacía
+  renderSong();
 }
 
 function renderComposeEditor() {
@@ -1469,6 +1593,9 @@ function renderComposeEditor() {
   el.innerHTML = `
   <div class="paper-card">
     <div class="card-content">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button onclick="composeStartBlank()" style="background:none;border:1px solid var(--staff-line);border-radius:4px;padding:0.35rem 0.8rem;font-size:0.75rem;cursor:pointer;color:var(--ink-muted);font-family:var(--font-body);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--staff-line)';this.style.color='var(--ink-muted)'">📄 Empezar canción en blanco</button>
+      </div>
       <div class="compose-header">
         <div class="form-group">
           <label>Título</label>
@@ -1637,6 +1764,234 @@ function composeSave() {
   saveAll(currentSong);
   renderSidebar();
   alert('Canción guardada');
+}
+
+// ── MODO PISTAS ───────────────────────────────────────────────────────────
+let pendingTrackName = null;
+let trackUnsupportedIds = new Set();
+
+function formatElapsed(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function renderTracksPanel() {
+  const song = currentSong;
+  const tracks = song.tracks || [];
+  const el = document.getElementById('mainContent');
+
+  const rowsHTML = tracks.length
+    ? tracks.map(trackRowHTML).join('')
+    : `<div class="form-hint">Todavía no hay pistas grabadas para «${escapeHtml(song.title || '')}».</div>`;
+
+  let actionHTML;
+  if (recordingState === 'recording') {
+    actionHTML = `
+      <span class="recording-dot"></span>
+      Grabando «${escapeHtml(pendingTrackName || '')}»… ${formatElapsed(Date.now() - (recordingStartedAt || Date.now()))}
+      <button class="btn-modal secondary" onclick="tracksStopRecording()">⏹ Detener grabación</button>`;
+  } else if (recordingState === 'uploading') {
+    actionHTML = `Subiendo pista…`;
+  } else {
+    actionHTML = `<button class="btn-modal primary" onclick="tracksStartRecording()">🔴 Grabar nueva pista</button>`;
+  }
+
+  el.innerHTML = `
+  <div class="paper-card">
+    <div class="card-content">
+      <div class="song-header">
+        <div>
+          <div class="song-title">${escapeHtml(song.title || '')}</div>
+          <div class="song-artist-display">${escapeHtml(song.artist || '')}</div>
+        </div>
+      </div>
+
+      <div class="section-label">Pistas de audio</div>
+
+      <div class="tracks-transport">
+        <button class="btn-modal primary" ${(tracksPlaying || !tracks.length) ? 'disabled' : ''} onclick="tracksPlayAll()">▶ Reproducir todas</button>
+        <button class="btn-modal secondary" ${!tracksPlaying ? 'disabled' : ''} onclick="tracksStopAll()">⏹ Detener</button>
+      </div>
+
+      <div class="tracks-list" id="tracksListContainer">${rowsHTML}</div>
+
+      <div style="margin-top:1rem;">${actionHTML}</div>
+
+      <div class="form-hint" style="margin-top:1.5rem;">
+        Graba cada instrumento o voz como una pista independiente y reprodúcelas todas a la vez
+        ajustando el volumen o silenciando cada una. De momento solo hay reproducir desde el
+        principio y detener — sin pausa/reanudar.
+      </div>
+    </div>
+  </div>`;
+}
+
+function trackRowHTML(t) {
+  const muted = !!t.muted;
+  const volume = typeof t.volume === 'number' ? t.volume : 1;
+  const unsupported = trackUnsupportedIds.has(t.id);
+  return `
+  <div class="track-row" data-track-id="${t.id}">
+    <span class="track-name">${escapeHtml(t.name || 'Pista')}</span>
+    <button class="track-mute-btn ${muted ? 'muted' : ''}" onclick="tracksToggleMute('${t.id}')" title="${muted ? 'Quitar silencio' : 'Silenciar'}">${muted ? '🔇' : '🔊'}</button>
+    <input type="range" class="track-volume" min="0" max="1" step="0.05" value="${volume}"
+      oninput="tracksAdjustVolume('${t.id}', this.value)"
+      onchange="tracksCommitVolume('${t.id}', this.value)">
+    ${unsupported ? '<span class="track-unsupported">No se puede reproducir en este navegador</span>' : ''}
+    <button class="compose-line-del" title="Eliminar pista" onclick="tracksDeleteTrack('${t.id}')">✕</button>
+  </div>`;
+}
+
+function tracksStartRecording() {
+  if (recordingState !== 'idle') return;
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    alert('Este navegador no permite grabar audio.');
+    return;
+  }
+  const name = prompt('Nombre de la pista (ej: Voz, Guitarra, Percusión):', 'Pista ' + (((currentSong.tracks || []).length) + 1));
+  if (!name || !name.trim()) return;
+  pendingTrackName = name.trim();
+
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    recordingStream = stream;
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', ''];
+    recordingMimeType = candidates.find(m => !m || MediaRecorder.isTypeSupported(m)) || '';
+    mediaRecorder = recordingMimeType ? new MediaRecorder(stream, { mimeType: recordingMimeType }) : new MediaRecorder(stream);
+    recordedChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = onTrackRecordingStop;
+    mediaRecorder.start();
+    recordingStartedAt = Date.now();
+    recordingState = 'recording';
+    renderTracksPanel();
+    recordingTimerInterval = setInterval(() => {
+      if (recordingState === 'recording') renderTracksPanel();
+    }, 500);
+  }).catch(e => {
+    alert('No se pudo acceder al micrófono: ' + e.message);
+    pendingTrackName = null;
+  });
+}
+
+function tracksStopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  if (recordingStream) recordingStream.getTracks().forEach(t => t.stop());
+  if (recordingTimerInterval) { clearInterval(recordingTimerInterval); recordingTimerInterval = null; }
+}
+
+async function onTrackRecordingStop() {
+  const blob = new Blob(recordedChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || recordingMimeType || 'audio/webm' });
+  recordedChunks = [];
+  recordingState = 'uploading';
+  renderTracksPanel();
+  try {
+    const trackId = String(Date.now());
+    const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
+    const { url, storagePath } = await uploadTrackFile(currentSong.id, trackId, blob, ext);
+    if (!currentSong.tracks) currentSong.tracks = [];
+    currentSong.tracks.push({
+      id: trackId,
+      name: pendingTrackName || 'Pista',
+      storagePath,
+      url,
+      mimeType: blob.type,
+      volume: 1,
+      muted: false,
+      createdAt: Date.now()
+    });
+    await saveAll(currentSong);
+  } catch(e) {
+    console.error('Error subiendo pista:', e);
+    alert('Error al subir la pista grabada. Inténtalo de nuevo.');
+  } finally {
+    recordingState = 'idle';
+    pendingTrackName = null;
+    renderTracksPanel();
+  }
+}
+
+function tracksDeleteTrack(trackId) {
+  if (!confirm('¿Eliminar esta pista de audio? No se puede deshacer.')) return;
+  const track = (currentSong.tracks || []).find(t => t.id === trackId);
+  if (!track) return;
+  currentSong.tracks = (currentSong.tracks || []).filter(t => t.id !== trackId);
+  saveAll(currentSong);
+  deleteTrackFile(track.storagePath);
+  audioBufferCache.delete(trackId);
+  trackUnsupportedIds.delete(trackId);
+  renderTracksPanel();
+}
+
+function tracksAdjustVolume(trackId, value) {
+  const track = (currentSong.tracks || []).find(t => t.id === trackId);
+  if (!track) return;
+  track.volume = parseFloat(value);
+  const active = activeSourceNodes.find(n => n.trackId === trackId);
+  if (active && !track.muted) active.gain.gain.value = track.volume;
+}
+
+function tracksCommitVolume(trackId, value) {
+  tracksAdjustVolume(trackId, value);
+  saveAll(currentSong);
+}
+
+function tracksToggleMute(trackId) {
+  const track = (currentSong.tracks || []).find(t => t.id === trackId);
+  if (!track) return;
+  track.muted = !track.muted;
+  const active = activeSourceNodes.find(n => n.trackId === trackId);
+  if (active) active.gain.gain.value = track.muted ? 0 : (typeof track.volume === 'number' ? track.volume : 1);
+  saveAll(currentSong);
+  renderTracksPanel();
+}
+
+async function getDecodedTrackBuffer(track) {
+  if (audioBufferCache.has(track.id)) return audioBufferCache.get(track.id);
+  const res = await fetch(track.url);
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = await tracksAudioCtx.decodeAudioData(arrayBuffer);
+  audioBufferCache.set(track.id, buffer);
+  return buffer;
+}
+
+async function tracksPlayAll() {
+  const tracks = currentSong.tracks || [];
+  if (!tracks.length || tracksPlaying) return;
+
+  if (!tracksAudioCtx) tracksAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (tracksAudioCtx.state === 'suspended') await tracksAudioCtx.resume();
+
+  tracksPlaying = true;
+  renderTracksPanel();
+
+  const startTime = tracksAudioCtx.currentTime + 0.15;
+  for (const track of tracks) {
+    try {
+      const buffer = await getDecodedTrackBuffer(track);
+      const source = tracksAudioCtx.createBufferSource();
+      source.buffer = buffer;
+      const gain = tracksAudioCtx.createGain();
+      gain.gain.value = track.muted ? 0 : (typeof track.volume === 'number' ? track.volume : 1);
+      source.connect(gain).connect(tracksAudioCtx.destination);
+      source.start(startTime);
+      activeSourceNodes.push({ trackId: track.id, source, gain });
+    } catch(e) {
+      console.error('No se pudo decodificar la pista', track.name, e);
+      trackUnsupportedIds.add(track.id);
+    }
+  }
+  renderTracksPanel();
+}
+
+function tracksStopAll() {
+  activeSourceNodes.forEach(({ source }) => {
+    try { source.stop(0); } catch(e) {}
+  });
+  activeSourceNodes = [];
+  tracksPlaying = false;
+  if (tracksMode) renderTracksPanel();
 }
 
 // ── AFINADOR ──────────────────────────────────────────────────────────────
@@ -1911,6 +2266,7 @@ function selectSong(id) {
   tpScrollPos = 0;
   currentSong = songs.find(s => String(s.id) === String(id));
   transposeAmount = 0;
+  tracksStopAll();
   renderSong();
   renderSidebar();
 }
@@ -1921,6 +2277,7 @@ function deleteSong(id) {
   deleteSongFromDB(String(id));
   if (String(composeSongId) === String(id)) composeSongId = null;
   currentSong = songs[0] || null;
+  tracksStopAll();
   renderSidebar();
   renderSong();
 }
@@ -1928,9 +2285,7 @@ function deleteSong(id) {
 // ── MODAL ─────────────────────────────────────────────────────────────────
 function openAddSong() {
   if (composeMode) {
-    createBlankSongForCompose();
-    composeSongId = null; // fuerza recarga de composeLines para la nueva canción vacía
-    renderSong();
+    composeStartBlank();
     return;
   }
   document.getElementById('addSongModal').classList.add('visible');
