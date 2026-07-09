@@ -619,13 +619,19 @@
 
   .track-row {
     display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    flex-direction: column;
+    gap: 0.5rem;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--staff-line);
     border-radius: 6px;
     margin-bottom: 0.6rem;
     background: rgba(0,0,0,0.02);
+  }
+
+  .track-row-top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     flex-wrap: wrap;
   }
 
@@ -638,6 +644,16 @@
   }
 
   .track-volume { accent-color: var(--accent); width: 100px; }
+
+  .track-waveform {
+    width: 100%;
+    height: 48px;
+    display: block;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.03);
+    touch-action: none;
+    cursor: ew-resize;
+  }
 
   .track-mute-btn {
     width: 30px; height: 30px;
@@ -1208,8 +1224,15 @@ let recordingStartedAt = null;
 let recordingTimerInterval = null;
 let tracksAudioCtx = null;
 let audioBufferCache = new Map(); // trackId -> AudioBuffer decodificado
-let activeSourceNodes = []; // {source, gain} de la reproducción en curso
-let tracksPlaying = false;
+let waveformPeaksCache = new Map(); // trackId -> Float32Array de picos
+let activeSourceNodes = []; // {trackId, source, gain} de la reproducción en curso
+let transportState = 'stopped'; // 'stopped' | 'playing' | 'paused'
+let transportOffset = 0; // segundos ya reproducidos (dentro de la ventana de recorte)
+let transportStartedAtCtxTime = 0;
+let transportEpoch = 0;
+let transportEndTimer = null;
+let transportTickInterval = null;
+let trimDrag = null; // {trackId, handle: 'start'|'end'} mientras se arrastra un tirador
 
 // ── STORAGE ───────────────────────────────────────────────────────────────
 // saveAll y deleteSongFromDB están definidos en el módulo Firebase de arriba
@@ -1534,7 +1557,7 @@ function toggleCompose() {
   if (composeMode && tracksMode) {
     tracksMode = false;
     document.getElementById('btn-tracks').classList.remove('active');
-    tracksStopAll();
+    tracksStop();
   }
   document.getElementById('btn-compose').classList.toggle('active', composeMode);
   renderSong();
@@ -1546,7 +1569,7 @@ function toggleTracks() {
     composeMode = false;
     document.getElementById('btn-compose').classList.remove('active');
   }
-  if (!tracksMode) tracksStopAll();
+  if (!tracksMode) tracksStop();
   document.getElementById('btn-tracks').classList.toggle('active', tracksMode);
   renderSong();
 }
@@ -1768,13 +1791,25 @@ function composeSave() {
 
 // ── MODO PISTAS ───────────────────────────────────────────────────────────
 let pendingTrackName = null;
-let trackUnsupportedIds = new Set();
+let trackPlaybackErrors = new Map(); // trackId -> {kind:'network'|'decode'|'unknown', message}
 
 function formatElapsed(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getMasterTrimmedDuration() {
+  const tracks = (currentSong && currentSong.tracks) || [];
+  let max = 0;
+  for (const t of tracks) {
+    const dur = typeof t.duration === 'number' ? t.duration : 0;
+    const trimStart = typeof t.trimStart === 'number' ? t.trimStart : 0;
+    const trimEnd = typeof t.trimEnd === 'number' ? t.trimEnd : dur;
+    max = Math.max(max, Math.max(0, trimEnd - trimStart));
+  }
+  return max;
 }
 
 function renderTracksPanel() {
@@ -1798,6 +1833,9 @@ function renderTracksPanel() {
     actionHTML = `<button class="btn-modal primary" onclick="tracksStartRecording()">🔴 Grabar nueva pista</button>`;
   }
 
+  const totalMs = getMasterTrimmedDuration() * 1000;
+  const elapsedMs = (transportOffset + (transportState === 'playing' && tracksAudioCtx ? (tracksAudioCtx.currentTime - transportStartedAtCtxTime) : 0)) * 1000;
+
   el.innerHTML = `
   <div class="paper-card">
     <div class="card-content">
@@ -1811,8 +1849,10 @@ function renderTracksPanel() {
       <div class="section-label">Pistas de audio</div>
 
       <div class="tracks-transport">
-        <button class="btn-modal primary" ${(tracksPlaying || !tracks.length) ? 'disabled' : ''} onclick="tracksPlayAll()">▶ Reproducir todas</button>
-        <button class="btn-modal secondary" ${!tracksPlaying ? 'disabled' : ''} onclick="tracksStopAll()">⏹ Detener</button>
+        <button class="btn-modal primary" ${(transportState === 'playing' || !tracks.length) ? 'disabled' : ''} onclick="tracksPlay()">▶ ${transportState === 'paused' ? 'Reanudar' : 'Reproducir'}</button>
+        <button class="btn-modal secondary" ${transportState !== 'playing' ? 'disabled' : ''} onclick="tracksPause()">⏸ Pausa</button>
+        <button class="btn-modal secondary" ${transportState === 'stopped' ? 'disabled' : ''} onclick="tracksStop()">⏹ Detener y rebobinar</button>
+        <span class="ctrl-value" id="transportTimeReadout">${formatElapsed(elapsedMs)} / ${formatElapsed(totalMs)}</span>
       </div>
 
       <div class="tracks-list" id="tracksListContainer">${rowsHTML}</div>
@@ -1820,36 +1860,191 @@ function renderTracksPanel() {
       <div style="margin-top:1rem;">${actionHTML}</div>
 
       <div class="form-hint" style="margin-top:1.5rem;">
-        Graba cada instrumento o voz como una pista independiente y reprodúcelas todas a la vez
-        ajustando el volumen o silenciando cada una. De momento solo hay reproducir desde el
-        principio y detener — sin pausa/reanudar.
+        Graba cada instrumento o voz como una pista independiente y reprodúcelas todas a la vez.
+        Arrastra los tiradores sobre la forma de onda para recortar el inicio o el final de cada
+        pista — el original nunca se toca, solo se ajusta lo que suena.
       </div>
     </div>
   </div>`;
+
+  requestAnimationFrame(() => {
+    for (const t of tracks) ensureTrackWaveform(t);
+  });
 }
 
 function trackRowHTML(t) {
   const muted = !!t.muted;
   const volume = typeof t.volume === 'number' ? t.volume : 1;
-  const unsupported = trackUnsupportedIds.has(t.id);
+  const err = trackPlaybackErrors.get(t.id);
+  const errText = !err ? '' : err.kind === 'network'
+    ? 'No se pudo descargar la pista (¿red o CORS?). Revisa la consola.'
+    : err.kind === 'decode'
+    ? 'Este navegador no puede reproducir el formato de esta pista.'
+    : 'No se pudo reproducir esta pista.';
   return `
   <div class="track-row" data-track-id="${t.id}">
-    <span class="track-name">${escapeHtml(t.name || 'Pista')}</span>
-    <button class="track-mute-btn ${muted ? 'muted' : ''}" onclick="tracksToggleMute('${t.id}')" title="${muted ? 'Quitar silencio' : 'Silenciar'}">${muted ? '🔇' : '🔊'}</button>
-    <input type="range" class="track-volume" min="0" max="1" step="0.05" value="${volume}"
-      oninput="tracksAdjustVolume('${t.id}', this.value)"
-      onchange="tracksCommitVolume('${t.id}', this.value)">
-    ${unsupported ? '<span class="track-unsupported">No se puede reproducir en este navegador</span>' : ''}
-    <button class="compose-line-del" title="Eliminar pista" onclick="tracksDeleteTrack('${t.id}')">✕</button>
+    <div class="track-row-top">
+      <span class="track-name">${escapeHtml(t.name || 'Pista')}</span>
+      <button class="track-mute-btn ${muted ? 'muted' : ''}" onclick="tracksToggleMute('${t.id}')" title="${muted ? 'Quitar silencio' : 'Silenciar'}">${muted ? '🔇' : '🔊'}</button>
+      <input type="range" class="track-volume" min="0" max="1" step="0.05" value="${volume}"
+        oninput="tracksAdjustVolume('${t.id}', this.value)"
+        onchange="tracksCommitVolume('${t.id}', this.value)">
+      <button class="compose-line-del" title="Eliminar pista" onclick="tracksDeleteTrack('${t.id}')">✕</button>
+    </div>
+    <canvas class="track-waveform" id="waveform-${t.id}" onpointerdown="tracksHandlePointerDown(event, '${t.id}')"></canvas>
+    ${errText ? `<div class="track-unsupported">${escapeHtml(errText)}</div>` : ''}
   </div>`;
 }
 
+// ── Forma de onda ─────────────────────────────────────────────────────────
+function computeWaveformPeaks(buffer, bucketCount) {
+  const data = buffer.getChannelData(0);
+  const length = data.length;
+  const buckets = Math.max(1, bucketCount);
+  const samplesPerBucket = Math.max(1, Math.floor(length / buckets));
+  const peaks = new Float32Array(buckets);
+  for (let b = 0; b < buckets; b++) {
+    const start = b * samplesPerBucket;
+    const end = Math.min(length, start + samplesPerBucket);
+    let peak = 0;
+    for (let i = start; i < end; i++) {
+      const v = Math.abs(data[i]);
+      if (v > peak) peak = v;
+    }
+    peaks[b] = peak;
+  }
+  return peaks;
+}
+
+function drawTrackWaveform(canvas, peaks, track, duration) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  if (!peaks || !peaks.length || !duration) return;
+
+  const trimStart = typeof track.trimStart === 'number' ? track.trimStart : 0;
+  const trimEnd = typeof track.trimEnd === 'number' ? track.trimEnd : duration;
+  const pxPerSec = W / duration;
+  const mid = H / 2;
+
+  ctx.fillStyle = '#a89070'; // --ink-light
+  for (let x = 0; x < W; x++) {
+    const peak = peaks[Math.min(peaks.length - 1, Math.floor((x / W) * peaks.length))] || 0;
+    const barH = Math.max(1, peak * (H - 4));
+    ctx.fillRect(x, mid - barH / 2, 1, barH);
+  }
+
+  const startPx = Math.max(0, Math.min(W, trimStart * pxPerSec));
+  const endPx = Math.max(0, Math.min(W, trimEnd * pxPerSec));
+  ctx.fillStyle = 'rgba(26,18,8,0.45)'; // --ink semi-transparente
+  if (startPx > 0) ctx.fillRect(0, 0, startPx, H);
+  if (endPx < W) ctx.fillRect(endPx, 0, W - endPx, H);
+
+  ctx.fillStyle = '#8b2e0f'; // --accent
+  ctx.fillRect(Math.max(0, startPx - 1.5), 0, 3, H);
+  ctx.fillRect(Math.max(0, endPx - 1.5), 0, 3, H);
+  ctx.fillRect(Math.max(0, startPx - 5), 0, 10, 6);
+  ctx.fillRect(Math.max(0, endPx - 5), 0, 10, 6);
+}
+
+async function ensureTrackWaveform(track) {
+  if (trackPlaybackErrors.has(track.id)) return;
+  const canvas = document.getElementById(`waveform-${track.id}`);
+  if (!canvas) return;
+  canvas.width = canvas.clientWidth || 300;
+  canvas.height = 48;
+
+  const cachedPeaks = waveformPeaksCache.get(track.id);
+  if (cachedPeaks && typeof track.duration === 'number') {
+    drawTrackWaveform(canvas, cachedPeaks, track, track.duration);
+    return;
+  }
+
+  try {
+    if (!tracksAudioCtx) tracksAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const buffer = await getDecodedTrackBuffer(track);
+    if (typeof track.duration !== 'number') {
+      track.duration = buffer.duration;
+      track.trimStart = typeof track.trimStart === 'number' ? track.trimStart : 0;
+      track.trimEnd = typeof track.trimEnd === 'number' ? track.trimEnd : buffer.duration;
+      saveAll(currentSong);
+    }
+    const peaks = computeWaveformPeaks(buffer, canvas.width);
+    waveformPeaksCache.set(track.id, peaks);
+    const freshCanvas = document.getElementById(`waveform-${track.id}`);
+    if (freshCanvas) drawTrackWaveform(freshCanvas, peaks, track, track.duration);
+  } catch(e) {
+    console.error('No se pudo cargar la forma de onda de', track.name, '-', e.trackErrorKind || 'unknown', e.message);
+    trackPlaybackErrors.set(track.id, { kind: e.trackErrorKind || 'unknown', message: e.message });
+    renderTracksPanel();
+  }
+}
+
+// ── Recorte no destructivo (arrastrar tiradores) ──────────────────────────
+function tracksHandlePointerDown(e, trackId) {
+  const canvas = e.currentTarget;
+  const track = (currentSong.tracks || []).find(t => t.id === trackId);
+  if (!track || typeof track.duration !== 'number') return;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pxPerSec = canvas.width / track.duration;
+  const trimStart = typeof track.trimStart === 'number' ? track.trimStart : 0;
+  const trimEnd = typeof track.trimEnd === 'number' ? track.trimEnd : track.duration;
+  const startPx = trimStart * pxPerSec, endPx = trimEnd * pxPerSec;
+  const HIT_PX = 10;
+  let handle = null;
+  if (Math.abs(x - startPx) <= HIT_PX) handle = 'start';
+  else if (Math.abs(x - endPx) <= HIT_PX) handle = 'end';
+  if (!handle) return;
+  trimDrag = { trackId, handle, canvas, duration: track.duration };
+  canvas.setPointerCapture(e.pointerId);
+}
+
+let trimDragRafPending = false;
+function tracksHandlePointerMove(e) {
+  if (!trimDrag) return;
+  const { trackId, handle, canvas, duration } = trimDrag;
+  const track = (currentSong.tracks || []).find(t => t.id === trackId);
+  if (!track) { trimDrag = null; return; }
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pxPerSec = canvas.width / duration;
+  const t = Math.max(0, Math.min(duration, x / pxPerSec));
+  const MIN_GAP = 0.05;
+  const curStart = typeof track.trimStart === 'number' ? track.trimStart : 0;
+  const curEnd = typeof track.trimEnd === 'number' ? track.trimEnd : duration;
+  if (handle === 'start') track.trimStart = Math.min(t, curEnd - MIN_GAP);
+  else track.trimEnd = Math.max(t, curStart + MIN_GAP);
+
+  if (!trimDragRafPending) {
+    trimDragRafPending = true;
+    requestAnimationFrame(() => {
+      trimDragRafPending = false;
+      if (!trimDrag) return;
+      const peaks = waveformPeaksCache.get(trackId);
+      if (peaks) drawTrackWaveform(canvas, peaks, track, duration);
+    });
+  }
+}
+
+function tracksHandlePointerUp() {
+  if (!trimDrag) return;
+  trimDrag = null;
+  saveAll(currentSong);
+}
+
+document.addEventListener('pointermove', tracksHandlePointerMove);
+document.addEventListener('pointerup', tracksHandlePointerUp);
+document.addEventListener('pointercancel', tracksHandlePointerUp);
+
+// ── Grabación ──────────────────────────────────────────────────────────────
 function tracksStartRecording() {
   if (recordingState !== 'idle') return;
   if (!navigator.mediaDevices || !window.MediaRecorder) {
     alert('Este navegador no permite grabar audio.');
     return;
   }
+  if (transportState !== 'stopped') tracksStop();
   const name = prompt('Nombre de la pista (ej: Voz, Guitarra, Percusión):', 'Pista ' + (((currentSong.tracks || []).length) + 1));
   if (!name || !name.trim()) return;
   pendingTrackName = name.trim();
@@ -1890,6 +2085,18 @@ async function onTrackRecordingStop() {
     const trackId = String(Date.now());
     const ext = blob.type.includes('mp4') ? 'm4a' : 'webm';
     const { url, storagePath } = await uploadTrackFile(currentSong.id, trackId, blob, ext);
+
+    let duration = null;
+    try {
+      if (!tracksAudioCtx) tracksAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuf = await blob.arrayBuffer();
+      const decoded = await tracksAudioCtx.decodeAudioData(arrayBuf);
+      duration = decoded.duration;
+      audioBufferCache.set(trackId, decoded);
+    } catch(e) {
+      console.error('No se pudo decodificar la grabación recién hecha para calcular su duración:', e);
+    }
+
     if (!currentSong.tracks) currentSong.tracks = [];
     currentSong.tracks.push({
       id: trackId,
@@ -1899,6 +2106,9 @@ async function onTrackRecordingStop() {
       mimeType: blob.type,
       volume: 1,
       muted: false,
+      duration,
+      trimStart: 0,
+      trimEnd: duration,
       createdAt: Date.now()
     });
     await saveAll(currentSong);
@@ -1920,7 +2130,14 @@ function tracksDeleteTrack(trackId) {
   saveAll(currentSong);
   deleteTrackFile(track.storagePath);
   audioBufferCache.delete(trackId);
-  trackUnsupportedIds.delete(trackId);
+  waveformPeaksCache.delete(trackId);
+  trackPlaybackErrors.delete(trackId);
+  activeSourceNodes = activeSourceNodes.filter(n => {
+    if (n.trackId !== trackId) return true;
+    try { n.source.stop(0); } catch(e) {}
+    return false;
+  });
+  if (trimDrag && trimDrag.trackId === trackId) trimDrag = null;
   renderTracksPanel();
 }
 
@@ -1947,51 +2164,117 @@ function tracksToggleMute(trackId) {
   renderTracksPanel();
 }
 
+// ── Decodificación (con diagnóstico red vs. formato) ──────────────────────
 async function getDecodedTrackBuffer(track) {
   if (audioBufferCache.has(track.id)) return audioBufferCache.get(track.id);
-  const res = await fetch(track.url);
-  const arrayBuffer = await res.arrayBuffer();
-  const buffer = await tracksAudioCtx.decodeAudioData(arrayBuffer);
-  audioBufferCache.set(track.id, buffer);
-  return buffer;
+  let arrayBuffer;
+  try {
+    const res = await fetch(track.url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    arrayBuffer = await res.arrayBuffer();
+  } catch(e) {
+    const err = new Error('network/CORS fetch failed: ' + e.message);
+    err.trackErrorKind = 'network';
+    throw err;
+  }
+  try {
+    const buffer = await tracksAudioCtx.decodeAudioData(arrayBuffer);
+    audioBufferCache.set(track.id, buffer);
+    return buffer;
+  } catch(e) {
+    const err = new Error('decode failed: ' + e.message);
+    err.trackErrorKind = 'decode';
+    throw err;
+  }
 }
 
-async function tracksPlayAll() {
+// ── Transporte: reproducir / pausar / detener ─────────────────────────────
+async function tracksPlay() {
   const tracks = currentSong.tracks || [];
-  if (!tracks.length || tracksPlaying) return;
+  if (!tracks.length || transportState === 'playing') return;
 
   if (!tracksAudioCtx) tracksAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (tracksAudioCtx.state === 'suspended') await tracksAudioCtx.resume();
 
-  tracksPlaying = true;
-  renderTracksPanel();
-
+  transportEpoch++;
+  const epoch = transportEpoch;
   const startTime = tracksAudioCtx.currentTime + 0.15;
+  let maxRemaining = 0;
+
   for (const track of tracks) {
+    const dur = typeof track.duration === 'number' ? track.duration : null;
+    if (dur == null) continue; // aún no se ha cargado su forma de onda / duración
+    const trimStart = typeof track.trimStart === 'number' ? track.trimStart : 0;
+    const trimEnd = typeof track.trimEnd === 'number' ? track.trimEnd : dur;
+    const remaining = (trimEnd - trimStart) - transportOffset;
+    if (remaining <= 0.01) continue; // esta pista ya no tiene nada que sonar desde aquí
+
     try {
       const buffer = await getDecodedTrackBuffer(track);
+      if (epoch !== transportEpoch) return; // se pausó/paró mientras decodificábamos
       const source = tracksAudioCtx.createBufferSource();
       source.buffer = buffer;
       const gain = tracksAudioCtx.createGain();
       gain.gain.value = track.muted ? 0 : (typeof track.volume === 'number' ? track.volume : 1);
       source.connect(gain).connect(tracksAudioCtx.destination);
-      source.start(startTime);
+      source.start(startTime, trimStart + transportOffset, remaining);
       activeSourceNodes.push({ trackId: track.id, source, gain });
+      trackPlaybackErrors.delete(track.id);
+      maxRemaining = Math.max(maxRemaining, remaining);
     } catch(e) {
-      console.error('No se pudo decodificar la pista', track.name, e);
-      trackUnsupportedIds.add(track.id);
+      console.error('No se pudo reproducir la pista', track.name, '-', e.trackErrorKind || 'unknown', e.message);
+      trackPlaybackErrors.set(track.id, { kind: e.trackErrorKind || 'unknown', message: e.message });
     }
   }
+
+  transportState = 'playing';
+  transportStartedAtCtxTime = startTime;
+  clearTimeout(transportEndTimer);
+  transportEndTimer = setTimeout(() => tracksOnNaturalEnd(epoch), maxRemaining * 1000 + 200);
+  if (transportTickInterval) clearInterval(transportTickInterval);
+  transportTickInterval = setInterval(updateTransportReadout, 250);
   renderTracksPanel();
 }
 
-function tracksStopAll() {
-  activeSourceNodes.forEach(({ source }) => {
-    try { source.stop(0); } catch(e) {}
-  });
+function tracksPause() {
+  if (transportState !== 'playing') return;
+  transportOffset = Math.min(getMasterTrimmedDuration(), transportOffset + (tracksAudioCtx.currentTime - transportStartedAtCtxTime));
+  transportEpoch++;
+  activeSourceNodes.forEach(({ source }) => { try { source.stop(0); } catch(e) {} });
   activeSourceNodes = [];
-  tracksPlaying = false;
+  clearTimeout(transportEndTimer);
+  transportEndTimer = null;
+  if (transportTickInterval) { clearInterval(transportTickInterval); transportTickInterval = null; }
+  transportState = 'paused';
+  renderTracksPanel();
+}
+
+function tracksStop() {
+  transportEpoch++;
+  activeSourceNodes.forEach(({ source }) => { try { source.stop(0); } catch(e) {} });
+  activeSourceNodes = [];
+  clearTimeout(transportEndTimer);
+  transportEndTimer = null;
+  if (transportTickInterval) { clearInterval(transportTickInterval); transportTickInterval = null; }
+  transportState = 'stopped';
+  transportOffset = 0;
   if (tracksMode) renderTracksPanel();
+}
+
+function tracksOnNaturalEnd(epochAtSchedule) {
+  if (epochAtSchedule !== transportEpoch) return;
+  tracksStop();
+}
+
+function updateTransportReadout() {
+  const el = document.getElementById('transportTimeReadout');
+  if (!el) {
+    if (transportTickInterval) { clearInterval(transportTickInterval); transportTickInterval = null; }
+    return;
+  }
+  const elapsed = transportOffset + (transportState === 'playing' ? (tracksAudioCtx.currentTime - transportStartedAtCtxTime) : 0);
+  const total = getMasterTrimmedDuration();
+  el.textContent = `${formatElapsed(elapsed * 1000)} / ${formatElapsed(total * 1000)}`;
 }
 
 // ── AFINADOR ──────────────────────────────────────────────────────────────
@@ -2266,7 +2549,7 @@ function selectSong(id) {
   tpScrollPos = 0;
   currentSong = songs.find(s => String(s.id) === String(id));
   transposeAmount = 0;
-  tracksStopAll();
+  tracksStop();
   renderSong();
   renderSidebar();
 }
@@ -2277,7 +2560,7 @@ function deleteSong(id) {
   deleteSongFromDB(String(id));
   if (String(composeSongId) === String(id)) composeSongId = null;
   currentSong = songs[0] || null;
-  tracksStopAll();
+  tracksStop();
   renderSidebar();
   renderSong();
 }
