@@ -486,6 +486,125 @@
   .btn-modal.secondary { background: rgba(0,0,0,0.08); color: var(--ink); }
   .btn-modal.secondary:hover { background: rgba(0,0,0,0.15); }
 
+  /* ── MODO COMPONER ── */
+  .compose-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .compose-lines { margin: 1rem 0 1.5rem; }
+
+  .compose-line-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .compose-line-num {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--ink-light);
+    min-width: 1.6em;
+    text-align: right;
+  }
+
+  .compose-line-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--staff-line);
+    border-radius: 4px;
+    background: white;
+    color: var(--ink);
+    outline: none;
+  }
+  .compose-line-input:focus { border-color: var(--accent); }
+
+  .compose-suggest-btn {
+    background: rgba(139,46,15,0.07);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 0.4rem 0.7rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .compose-suggest-btn:hover { background: var(--accent); color: white; }
+  .compose-suggest-btn:disabled { opacity: 0.5; cursor: wait; }
+
+  .compose-line-del {
+    background: none;
+    border: none;
+    color: var(--ink-light);
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.3rem 0.4rem;
+    line-height: 1;
+  }
+  .compose-line-del:hover { color: var(--accent); }
+
+  .compose-suggestion-box {
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    margin: -0.1rem 0 0.75rem 2.1em;
+    background: rgba(139,46,15,0.04);
+    font-size: 0.85rem;
+  }
+
+  .compose-suggestion-chord {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--accent);
+    margin-right: 0.4rem;
+  }
+
+  .compose-suggestion-lyric { color: var(--ink); }
+
+  .compose-suggestion-nota {
+    font-size: 0.7rem;
+    color: var(--ink-muted);
+    margin-top: 0.35rem;
+    font-style: italic;
+  }
+
+  .compose-suggestion-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; }
+
+  .compose-suggestion-actions button {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+
+  .compose-accept-btn { background: var(--accent); color: white; }
+  .compose-accept-btn:hover { background: var(--accent-light); }
+  .compose-discard-btn { background: rgba(0,0,0,0.08); color: var(--ink); }
+  .compose-discard-btn:hover { background: rgba(0,0,0,0.15); }
+
+  .estado-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  @media (max-width: 700px) {
+    .compose-header { grid-template-columns: 1fr; }
+  }
+
   /* ── EMPTY STATE ── */
   .empty-state {
     text-align: center;
@@ -646,6 +765,7 @@
   <div class="toolbar">
     <button class="btn" id="btn-chords" onclick="toggleChords()">Acordes</button>
     <button class="btn" id="btn-tab" onclick="toggleTab()">Tablatura</button>
+    <button class="btn" id="btn-compose" onclick="toggleCompose()" title="Modo Componer">✎ Componer</button>
     <div class="sep"></div>
     <button class="btn" onclick="transpose(-1)">♭ −1</button>
     <button class="btn" onclick="transpose(1)">♯ +1</button>
@@ -841,6 +961,8 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, query, where, orderBy }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFunctions, httpsCallable }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -855,6 +977,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 let currentUser = null;
 
 // ── AUTH UI ───────────────────────────────────────────────────────────────
@@ -947,6 +1070,14 @@ window.deleteSongFromDB = async function(id) {
   }
 };
 
+// ── CLOUD FUNCTION: sugerencia de línea (modo Componer) ───────────────────
+window.callSuggestLine = async function(payload) {
+  if (!currentUser) throw new Error('No autenticado');
+  const suggestLineFn = httpsCallable(functions, 'suggestLine');
+  const res = await suggestLineFn(payload);
+  return res.data;
+};
+
 // ── DATA ──────────────────────────────────────────────────────────────────
 </script><!-- /firebase module -->
 
@@ -975,6 +1106,13 @@ let currentSong = null;
 let transposeAmount = 0;
 let showChordsMode = true;
 let showTabMode = false;
+
+// ── MODO COMPONER ─────────────────────────────────────────────────────────
+let composeMode = false;
+let composeSongId = null; // id de la canción cuyas líneas están cargadas en composeLines
+let composeLines = [];
+let composeSuggestions = {}; // idx -> {lyric, chord, nota}
+let composeLoadingIdx = null;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────
 // saveAll y deleteSongFromDB están definidos en el módulo Firebase de arriba
@@ -1121,12 +1259,17 @@ function drawChord(canvas, chordName, smallSize = false) {
 // ── RENDER ────────────────────────────────────────────────────────────────
 function renderSong() {
   const el = document.getElementById('mainContent');
-  if (!currentSong) {
+  if (!currentSong && !composeMode) {
     el.innerHTML = `<div class="empty-state">
       <h2>Tu cancionero está vacío</h2>
       <p>Añade tu primera canción para empezar</p>
       <button class="btn btn-accent" style="padding:0.7rem 1.5rem;font-size:1rem;border-radius:6px;" onclick="openAddSong()">+ Añadir canción</button>
     </div>`;
+    return;
+  }
+
+  if (composeMode) {
+    renderComposeEditor();
     return;
   }
 
@@ -1258,6 +1401,242 @@ function renderSong() {
 function formatTab(tab) {
   return tab.replace(/([eEBGDAd])\|/g, '<span class="tab-string-name">$1|</span>')
             .replace(/\b([0-9]{1,2})\b/g, '<span class="tab-fret-num">$1</span>');
+}
+
+// ── MODO COMPONER ─────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// Simplifica una línea con el formato de corchetes ya existente a {lyric, chord}
+// para enviarla como contexto a la Cloud Function suggestLine.
+function simplifyLine(raw) {
+  const trimmed = (raw || '').trim();
+  const bracketOnly = trimmed.match(/^\[([^\[\]]+)\]$/);
+  if (bracketOnly && !CHORD_RE.test(bracketOnly[1].trim())) {
+    // Línea de sección, ej: [Estribillo]
+    return { lyric: trimmed, chord: '' };
+  }
+  const chordMatch = raw.match(/\[([A-G][#b]?[^\[\]]*)\]/);
+  const chord = chordMatch ? chordMatch[1] : '';
+  const lyric = (raw || '').replace(/\[[^\]]*\]/g, '');
+  return { lyric, chord };
+}
+
+function toggleCompose() {
+  composeMode = !composeMode;
+  document.getElementById('btn-compose').classList.toggle('active', composeMode);
+  renderSong();
+}
+
+function createBlankSongForCompose() {
+  const newSong = {
+    id: String(Date.now()),
+    title: 'Nueva canción',
+    artist: '',
+    key: 'Am',
+    lyrics: '',
+    tab: '',
+    estado: 'borrador',
+    createdAt: Date.now()
+  };
+  songs.push(newSong);
+  currentSong = newSong;
+  renderSidebar();
+}
+
+function renderComposeEditor() {
+  if (!currentSong) createBlankSongForCompose();
+  const song = currentSong;
+
+  // Recarga las líneas solo si hemos cambiado de canción, para no perder
+  // ediciones sin guardar al alternar Componer con Acordes/Tablatura.
+  if (composeSongId !== song.id) {
+    composeLines = (song.lyrics || '').split('\n');
+    if (composeLines.length === 0) composeLines = [''];
+    composeSuggestions = {};
+    composeSongId = song.id;
+  }
+
+  const linesHTML = composeLines.map((raw, idx) => composeLineRowHTML(raw, idx)).join('');
+  const keys = ['Am','Em','Dm','C','G','D','F','E','A','Bm','F#m'];
+
+  const el = document.getElementById('mainContent');
+  el.innerHTML = `
+  <div class="paper-card">
+    <div class="card-content">
+      <div class="compose-header">
+        <div class="form-group">
+          <label>Título</label>
+          <input type="text" id="composeTitle" value="${escapeHtml(song.title || '')}" oninput="composeUpdateMeta()">
+        </div>
+        <div class="form-group">
+          <label>Artista</label>
+          <input type="text" id="composeArtist" value="${escapeHtml(song.artist || '')}" oninput="composeUpdateMeta()">
+        </div>
+        <div class="form-group">
+          <label>Tonalidad</label>
+          <select id="composeKey" onchange="composeUpdateMeta()">
+            ${keys.map(k => `<option ${song.key === k ? 'selected' : ''}>${k}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="composeEstado" onchange="composeUpdateMeta()">
+            <option value="" ${!song.estado ? 'selected' : ''}>Sin marcar</option>
+            <option value="borrador" ${song.estado === 'borrador' ? 'selected' : ''}>Borrador</option>
+            <option value="terminada" ${song.estado === 'terminada' ? 'selected' : ''}>Terminada</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-label">Letra y acordes — línea a línea</div>
+      <div class="compose-lines" id="composeLinesContainer">${linesHTML}</div>
+
+      <div style="display:flex;gap:0.5rem;margin-bottom:1.5rem;">
+        <button class="btn-modal secondary" onclick="composeAddLine()">+ Línea</button>
+        <button class="btn-modal secondary" onclick="composeAddSection()">+ Sección</button>
+      </div>
+
+      <div class="form-hint" style="margin-bottom:1.5rem;">
+        Cada línea usa el mismo formato de siempre: acordes entre [corchetes] justo antes de la sílaba
+        donde suenan. Usa [Verso], [Estribillo], [Puente]… en una línea sola para marcar secciones.
+        El botón «Sugerir» pide una propuesta para completar esa línea — nunca se aplica sola, tú decides.
+      </div>
+
+      <div class="modal-actions" style="justify-content:flex-start;">
+        <button class="btn-modal primary" onclick="composeSave()">💾 Guardar canción</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function composeLineRowHTML(raw, idx) {
+  const suggestion = composeSuggestions[idx];
+  const loading = composeLoadingIdx === idx;
+  let html = `
+  <div class="compose-line-row" data-idx="${idx}">
+    <span class="compose-line-num">${idx + 1}</span>
+    <input type="text" class="compose-line-input" value="${escapeHtml(raw)}"
+      oninput="composeUpdateLine(${idx}, this.value)" placeholder="[Am]Escribe aquí la letra…">
+    <button class="compose-suggest-btn" ${loading ? 'disabled' : ''} onclick="composeSuggest(${idx})">${loading ? '…' : 'Sugerir'}</button>
+    <button class="compose-line-del" title="Eliminar línea" onclick="composeDeleteLine(${idx})">✕</button>
+  </div>`;
+  if (suggestion) html += composeSuggestionBoxHTML(idx, suggestion);
+  return html;
+}
+
+function composeSuggestionBoxHTML(idx, s) {
+  return `
+  <div class="compose-suggestion-box" id="composeSuggestionBox-${idx}">
+    <div>
+      ${s.chord ? `<span class="compose-suggestion-chord">[${escapeHtml(s.chord)}]</span>` : ''}
+      <span class="compose-suggestion-lyric">${escapeHtml(s.lyric)}</span>
+    </div>
+    ${s.nota ? `<div class="compose-suggestion-nota">${escapeHtml(s.nota)}</div>` : ''}
+    <div class="compose-suggestion-actions">
+      <button class="compose-accept-btn" onclick="composeAcceptSuggestion(${idx})">Aceptar</button>
+      <button class="compose-discard-btn" onclick="composeDiscardSuggestion(${idx})">Descartar</button>
+    </div>
+  </div>`;
+}
+
+function composeUpdateLine(idx, value) {
+  composeLines[idx] = value;
+}
+
+function composeUpdateMeta() {
+  if (!currentSong) return;
+  const t = document.getElementById('composeTitle');
+  const a = document.getElementById('composeArtist');
+  const k = document.getElementById('composeKey');
+  const e = document.getElementById('composeEstado');
+  if (t) currentSong.title = t.value;
+  if (a) currentSong.artist = a.value;
+  if (k) currentSong.key = k.value;
+  if (e) {
+    if (e.value) currentSong.estado = e.value;
+    else delete currentSong.estado;
+  }
+  renderSidebar();
+}
+
+function composeAddLine() {
+  composeLines.push('');
+  renderComposeEditor();
+}
+
+function composeAddSection() {
+  const name = prompt('Nombre de la sección (Verso, Estribillo, Puente, Intro…):', 'Estribillo');
+  if (!name || !name.trim()) return;
+  composeLines.push(`[${name.trim()}]`);
+  renderComposeEditor();
+}
+
+function composeDeleteLine(idx) {
+  composeLines.splice(idx, 1);
+  if (composeLines.length === 0) composeLines = [''];
+  const shifted = {};
+  Object.keys(composeSuggestions).forEach(k => {
+    const i = parseInt(k, 10);
+    if (i < idx) shifted[i] = composeSuggestions[i];
+    else if (i > idx) shifted[i - 1] = composeSuggestions[i];
+  });
+  composeSuggestions = shifted;
+  renderComposeEditor();
+}
+
+async function composeSuggest(idx) {
+  if (composeLoadingIdx !== null) return;
+  composeLoadingIdx = idx;
+  renderComposeEditor();
+  try {
+    const result = await callSuggestLine({
+      title: currentSong.title || '',
+      artist: currentSong.artist || '',
+      key: currentSong.key || '',
+      lines: composeLines.map(simplifyLine),
+      targetIndex: idx
+    });
+    composeSuggestions[idx] = result;
+  } catch (e) {
+    console.error('Error pidiendo sugerencia:', e);
+    alert('No se pudo obtener una sugerencia. Inténtalo de nuevo.');
+  } finally {
+    composeLoadingIdx = null;
+    renderComposeEditor();
+  }
+}
+
+function composeAcceptSuggestion(idx) {
+  const s = composeSuggestions[idx];
+  if (!s) return;
+  const chordPart = s.chord ? `[${s.chord}]` : '';
+  composeLines[idx] = `${chordPart}${s.lyric || ''}`;
+  delete composeSuggestions[idx];
+  renderComposeEditor();
+}
+
+function composeDiscardSuggestion(idx) {
+  delete composeSuggestions[idx];
+  renderComposeEditor();
+}
+
+function composeSave() {
+  if (!currentSong) return;
+  composeUpdateMeta();
+  if (!currentSong.title || !currentSong.title.trim()) {
+    alert('El título es obligatorio');
+    return;
+  }
+  currentSong.lyrics = composeLines.join('\n');
+  saveAll(currentSong);
+  renderSidebar();
+  alert('Canción guardada');
 }
 
 // ── AFINADOR ──────────────────────────────────────────────────────────────
@@ -1522,7 +1901,7 @@ function renderSidebar() {
   const list = document.getElementById('songList');
   list.innerHTML = songs.map(s => `
     <li data-id="${s.id}" onclick="selectSong('${s.id}')">
-      <span class="song-name">${s.title}</span>
+      <span class="song-name">${s.title}${s.estado === 'borrador' ? '<span class="estado-dot" title="Borrador — aún en proceso"></span>' : ''}</span>
       <span class="song-artist">${s.artist}</span>
     </li>`).join('');
 }
@@ -1540,6 +1919,7 @@ function deleteSong(id) {
   if (!confirm('¿Eliminar esta canción?')) return;
   songs = songs.filter(s => String(s.id) !== String(id));
   deleteSongFromDB(String(id));
+  if (String(composeSongId) === String(id)) composeSongId = null;
   currentSong = songs[0] || null;
   renderSidebar();
   renderSong();
@@ -1547,6 +1927,12 @@ function deleteSong(id) {
 
 // ── MODAL ─────────────────────────────────────────────────────────────────
 function openAddSong() {
+  if (composeMode) {
+    createBlankSongForCompose();
+    composeSongId = null; // fuerza recarga de composeLines para la nueva canción vacía
+    renderSong();
+    return;
+  }
   document.getElementById('addSongModal').classList.add('visible');
 }
 
@@ -1823,7 +2209,7 @@ function openSongPanel() {
   const list = document.getElementById('songListMobile');
   list.innerHTML = songs.map(s => `
     <li data-id="${s.id}" onclick="selectSong('${s.id}');closeSongPanel();">
-      <span class="song-name">${s.title}</span>
+      <span class="song-name">${s.title}${s.estado === 'borrador' ? '<span class="estado-dot" title="Borrador — aún en proceso"></span>' : ''}</span>
       <span class="song-artist">${s.artist}</span>
     </li>`).join('');
   list.querySelectorAll('li').forEach(li => {
