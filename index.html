@@ -1449,6 +1449,12 @@ function createBlankSongForCompose() {
   renderSidebar();
 }
 
+function composeStartBlank() {
+  createBlankSongForCompose();
+  composeSongId = null; // fuerza recarga de composeLines para la nueva canción vacía
+  renderSong();
+}
+
 function renderComposeEditor() {
   if (!currentSong) createBlankSongForCompose();
   const song = currentSong;
@@ -1469,6 +1475,9 @@ function renderComposeEditor() {
   el.innerHTML = `
   <div class="paper-card">
     <div class="card-content">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button onclick="composeStartBlank()" style="background:none;border:1px solid var(--staff-line);border-radius:4px;padding:0.35rem 0.8rem;font-size:0.75rem;cursor:pointer;color:var(--ink-muted);font-family:var(--font-body);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--staff-line)';this.style.color='var(--ink-muted)'">📄 Empezar canción en blanco</button>
+      </div>
       <div class="compose-header">
         <div class="form-group">
           <label>Título</label>
@@ -1928,9 +1937,7 @@ function deleteSong(id) {
 // ── MODAL ─────────────────────────────────────────────────────────────────
 function openAddSong() {
   if (composeMode) {
-    createBlankSongForCompose();
-    composeSongId = null; // fuerza recarga de composeLines para la nueva canción vacía
-    renderSong();
+    composeStartBlank();
     return;
   }
   document.getElementById('addSongModal').classList.add('visible');
