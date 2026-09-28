@@ -6,37 +6,54 @@
 <title>Prototipo: Guitar Hero desde tablatura</title>
 <style>
   :root {
-    --bg: #0d0e16; --lane-bg: #14151f; --line: #262838;
-    --hit: #ffffff; --miss: #ff5566; --good: #5bd67c;
-    --str-e: #ff6b6b; --str-B: #ffb347; --str-G: #ffe45e; --str-D: #6bffb0; --str-A: #5ec8ff; --str-E: #b98bff;
+    --bg-a: #05040c; --bg-b: #0c0a1f; --panel: rgba(20,18,40,0.55); --panel-line: rgba(150,170,255,0.18);
+    --neon-cyan: #00e5ff; --good: #4dffb0; --miss: #ff3b6e;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg); color: #eef; font-family: 'Segoe UI', Roboto, sans-serif;
-    display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 1rem;
+    margin: 0; min-height: 100vh; padding: 1.25rem 1rem;
+    background: radial-gradient(ellipse at 50% 0%, #14123a 0%, var(--bg-b) 45%, var(--bg-a) 100%);
+    color: #e8ecff; font-family: 'Segoe UI', Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
   }
-  h1 { font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0 0.1rem; }
-  .subtitle { font-size: 0.78rem; color: #9497ad; margin-bottom: 0.75rem; text-align: center; max-width: 640px; }
-  .subtitle b { color: #ffb347; }
-  .hud { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 0.6rem; font-size: 0.85rem; }
-  .hud .score { font-size: 1.3rem; font-weight: 800; }
-  .hud .combo { color: #5bd67c; font-weight: 700; }
+  h1 {
+    font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; margin: 0.25rem 0 0.2rem;
+    background: linear-gradient(90deg, #00e5ff, #c65cff, #ff3b6e);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle { font-size: 0.78rem; color: #9ba3d0; margin-bottom: 0.85rem; text-align: center; max-width: 640px; line-height: 1.4; }
+  .subtitle b { color: #00e5ff; font-weight: 700; }
+  .hud {
+    display: flex; gap: 1.5rem; align-items: center; margin-bottom: 0.7rem; font-size: 0.85rem;
+    background: var(--panel); border: 1px solid var(--panel-line); border-radius: 999px;
+    padding: 0.5rem 1.4rem; backdrop-filter: blur(10px);
+  }
+  .hud .score { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(0,229,255,0.6); }
+  .hud .combo { color: var(--good); font-weight: 700; text-shadow: 0 0 8px rgba(77,255,176,0.6); }
   #stage { position: relative; }
-  canvas { background: var(--lane-bg); border-radius: 10px; border: 1px solid var(--line); display: block; }
-  .controls { margin-top: 0.75rem; display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; align-items: center; }
-  .speed-label { font-size: 0.78rem; color: #9497ad; margin-left: 0.4rem; }
+  canvas {
+    background: #05040c; border-radius: 14px; display: block;
+    border: 1px solid var(--panel-line);
+    box-shadow: 0 0 40px rgba(0,229,255,0.12), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  }
+  .controls {
+    margin-top: 0.85rem; display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; align-items: center;
+    background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px; padding: 0.6rem 0.9rem;
+    backdrop-filter: blur(10px);
+  }
+  .speed-label { font-size: 0.78rem; color: #9ba3d0; margin-left: 0.4rem; }
   button {
-    background: #1d1f2e; color: #eef; border: 1px solid var(--line); border-radius: 8px;
-    padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; font-weight: 600;
+    background: rgba(255,255,255,0.04); color: #e8ecff; border: 1px solid var(--panel-line); border-radius: 8px;
+    padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; transition: all 0.15s;
   }
-  button:hover { border-color: #5ec8ff; }
-  .keys-hint { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+  button:hover { border-color: #00e5ff; box-shadow: 0 0 14px rgba(0,229,255,0.35); color: #00e5ff; }
+  .keys-hint { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
   .key-chip {
-    width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 0.85rem; color: #10111a; border: 2px solid transparent;
+    width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; color: #05040c; border: 2px solid transparent;
   }
-  .legend { display:flex; gap:1rem; margin-top:0.6rem; font-size:0.72rem; color:#9497ad; flex-wrap:wrap; justify-content:center; }
-  .legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:0.3rem; vertical-align:middle; }
+  .legend { display:flex; gap:1rem; margin-top:0.7rem; font-size:0.72rem; color:#9ba3d0; flex-wrap:wrap; justify-content:center; max-width:520px; }
+  .legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:0.3rem; vertical-align:middle; box-shadow: 0 0 6px currentColor; }
 </style>
 </head>
 <body>
@@ -77,7 +94,7 @@ const CHART = {"durationSec":8.192,"events":[{"timeSec":0.094,"string":"A","fret
 
 // Orden visual de carriles (grave -> agudo, como en un mástil real)
 const LANES = ['E', 'A', 'D', 'G', 'B', 'e'];
-const LANE_COLOR = { E: '#b98bff', A: '#5ec8ff', D: '#6bffb0', G: '#ffe45e', B: '#ffb347', e: '#ff6b6b' };
+const LANE_COLOR = { E: '#c65cff', A: '#00e5ff', D: '#00ffa2', G: '#fff45e', B: '#ff9d3d', e: '#ff3b6e' };
 const KEYS = ['a', 's', 'd', 'f', 'g', 'h']; // una tecla por carril, mismo orden que LANES
 
 const cv = document.getElementById('cv');
@@ -88,6 +105,40 @@ const HIT_Y = H - 70;
 let NOTE_TRAVEL_SEC = 3.2; // cuánto tarda una nota en caer desde arriba hasta la línea (más alto = más lento/fácil de leer)
 const HIT_WINDOW = 0.15; // ±150ms
 const STRING_THICKNESS = { E: 3, A: 2.6, D: 2.2, G: 1.8, B: 1.4, e: 1.1 }; // grave -> agudo, como cuerdas reales
+
+// ── Carretera con perspectiva (converge hacia un punto de fuga arriba) ─────
+const TOP_SCALE = 0.4; // ancho relativo de la carretera en el punto más lejano
+function depthAt(y) { return Math.max(0, Math.min(1.15, y / HIT_Y)); } // 0=lejos, 1=línea de impacto
+function highwayWidthAt(k) { return W * (TOP_SCALE + (1 - TOP_SCALE) * k); }
+function highwayLeftAt(k) { return (W - highwayWidthAt(k)) / 2; }
+function laneWidthAt(k) { return highwayWidthAt(k) / LANES.length; }
+function laneCenterXAt(i, k) { return highwayLeftAt(k) + (i + 0.5) * laneWidthAt(k); }
+
+// ── Partículas al acertar una nota ──────────────────────────────────────────
+let particles = []; // {x,y,vx,vy,life,color}
+function spawnHitParticles(x, y, color) {
+  for (let i = 0; i < 10; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 40 + Math.random() * 90;
+    particles.push({ x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1, color });
+  }
+}
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt * 1.6;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3 * p.life + 1, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+}
 
 let audioCtx = null;
 let startCtxTime = 0;
@@ -124,6 +175,8 @@ function startGame() {
   running = true;
   startCtxTime = audioCtx.currentTime + 0.3;
   lastBeatScheduled = -1;
+  lastFrameMs = null;
+  particles = [];
   document.getElementById('statusEl').textContent = 'Tocando…';
   requestAnimationFrame(loop);
 }
@@ -178,6 +231,7 @@ function judge(laneIdx) {
     best.hit = true;
     combo++; maxCombo = Math.max(maxCombo, combo);
     score += Math.round(100 * (1 - bestDiff / HIT_WINDOW)) + combo;
+    spawnHitParticles(laneCenterXAt(laneIdx, 1), HIT_Y, LANE_COLOR[string]);
   } else {
     combo = 0;
   }
@@ -200,75 +254,115 @@ function timeToY(dt) {
   return HIT_Y - (dt / NOTE_TRAVEL_SEC) * HIT_Y;
 }
 
+const STARS = Array.from({ length: 60 }, () => ({
+  x: Math.random() * W, y: Math.random() * (H - 90), r: Math.random() * 1.3 + 0.3, phase: Math.random() * Math.PI * 2
+}));
+
 function draw(songTime) {
   ctx.clearRect(0, 0, W, H);
 
-  // Fondo tipo mástil (madera oscura, más clara hacia el centro)
-  const wood = ctx.createLinearGradient(0, 0, W, 0);
-  wood.addColorStop(0, '#1b140f');
-  wood.addColorStop(0.5, '#241a12');
-  wood.addColorStop(1, '#1b140f');
-  ctx.fillStyle = wood;
+  // Fondo: espacio profundo con resplandor hacia el punto de fuga
+  const sky = ctx.createLinearGradient(0, 0, 0, HIT_Y);
+  sky.addColorStop(0, '#0a0820');
+  sky.addColorStop(1, '#05040c');
+  ctx.fillStyle = sky;
   ctx.fillRect(0, 0, W, H);
 
-  // Carriles (separación sutil entre cuerdas)
-  for (let i = 0; i < LANES.length; i++) {
-    const x = i * LANE_W;
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)';
-    ctx.fillRect(x, 0, LANE_W, H);
-    if (laneFlash[i] > 0) {
-      ctx.fillStyle = `rgba(255,255,255,${0.18 * laneFlash[i]})`;
-      ctx.fillRect(x, 0, LANE_W, H);
-      laneFlash[i] *= 0.85;
-      if (laneFlash[i] < 0.02) laneFlash[i] = 0;
-    }
+  const glow = ctx.createRadialGradient(W / 2, 0, 0, W / 2, 0, W * 0.6);
+  glow.addColorStop(0, 'rgba(0,229,255,0.10)');
+  glow.addColorStop(1, 'rgba(0,229,255,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, HIT_Y);
+
+  for (const s of STARS) {
+    const tw = 0.5 + 0.5 * Math.sin(songTime * 2 + s.phase);
+    ctx.fillStyle = `rgba(200,220,255,${0.15 + 0.35 * tw})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
   }
 
+  // Bordes de la carretera (convergen hacia el punto de fuga arriba)
+  ctx.strokeStyle = 'rgba(0,229,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(highwayLeftAt(0), 0); ctx.lineTo(highwayLeftAt(1.15), H);
+  ctx.moveTo(highwayLeftAt(0) + highwayWidthAt(0), 0); ctx.lineTo(highwayLeftAt(1.15) + highwayWidthAt(1.15), H);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
   // Trastes: líneas horizontales que caen a la misma velocidad que las notas,
-  // uno por tiempo (beat), más marcado cada compás (4 tiempos) con incrustación.
+  // uno por tiempo (beat), más marcado cada compás (4 tiempos), con el ancho
+  // de la carretera en esa profundidad (efecto de perspectiva).
   const firstBeat = Math.floor((songTime - 0.5) / SEC_PER_BEAT);
   const lastBeat = Math.ceil((songTime + NOTE_TRAVEL_SEC) / SEC_PER_BEAT);
   for (let b = Math.max(0, firstBeat); b <= lastBeat; b++) {
     const dt = b * SEC_PER_BEAT - songTime;
     const y = timeToY(dt);
     if (y < -10 || y > H + 10) continue;
+    const k = depthAt(y);
+    const left = highwayLeftAt(k), right = left + highwayWidthAt(k);
     const isMeasure = b % 4 === 0;
-    ctx.strokeStyle = isMeasure ? 'rgba(230,210,180,0.55)' : 'rgba(230,210,180,0.18)';
+    ctx.strokeStyle = isMeasure ? 'rgba(198,92,255,0.65)' : 'rgba(150,170,255,0.22)';
     ctx.lineWidth = isMeasure ? 2 : 1;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    if (isMeasure) {
-      // incrustaciones tipo mástil real, en los carriles centrales
-      ctx.fillStyle = 'rgba(230,210,180,0.5)';
-      const midA = LANE_W * 2.5, midB = LANE_W * 3.5;
-      ctx.beginPath(); ctx.arc(midA, y, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(midB, y, 3, 0, Math.PI * 2); ctx.fill();
-    }
+    if (isMeasure) { ctx.shadowColor = '#c65cff'; ctx.shadowBlur = 10; }
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+    ctx.shadowBlur = 0;
   }
 
-  // "Cuerdas": línea vertical central de cada carril, grosor según cuerda real
+  // "Cuerdas": línea de cada carril con grosor según cuerda real, siguiendo la perspectiva
   for (let i = 0; i < LANES.length; i++) {
-    const x = i * LANE_W + LANE_W / 2;
-    ctx.strokeStyle = 'rgba(210,215,225,0.35)';
+    const color = LANE_COLOR[LANES[i]];
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.45;
     ctx.lineWidth = STRING_THICKNESS[LANES[i]];
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.shadowColor = color; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(laneCenterXAt(i, 0), 0);
+    ctx.lineTo(laneCenterXAt(i, 1.15), H);
+    ctx.stroke();
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+
+  // Resplandor al pulsar una tecla (columna de luz en su color)
+  for (let i = 0; i < LANES.length; i++) {
+    if (laneFlash[i] <= 0) continue;
+    const color = LANE_COLOR[LANES[i]];
+    ctx.save();
+    ctx.globalAlpha = 0.25 * laneFlash[i];
+    ctx.fillStyle = color;
+    const left = laneCenterXAt(i, 0) - laneWidthAt(0) / 2;
+    ctx.beginPath();
+    ctx.moveTo(laneCenterXAt(i, 0) - laneWidthAt(0) / 2, 0);
+    ctx.lineTo(laneCenterXAt(i, 0) + laneWidthAt(0) / 2, 0);
+    ctx.lineTo(laneCenterXAt(i, 1) + laneWidthAt(1) / 2, H);
+    ctx.lineTo(laneCenterXAt(i, 1) - laneWidthAt(1) / 2, H);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    laneFlash[i] *= 0.85;
+    if (laneFlash[i] < 0.02) laneFlash[i] = 0;
   }
 
   // Nombre de cada cuerda, fijo arriba del todo
   for (let i = 0; i < LANES.length; i++) {
-    const x = i * LANE_W + LANE_W / 2;
-    ctx.fillStyle = LANE_COLOR[LANES[i]];
-    ctx.font = 'bold 16px sans-serif';
+    const x = laneCenterXAt(i, 0);
+    const color = LANE_COLOR[LANES[i]];
+    ctx.fillStyle = color;
+    ctx.shadowColor = color; ctx.shadowBlur = 8;
+    ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText(LANES[i], x, 8);
+    ctx.shadowBlur = 0;
   }
 
   // Línea de impacto
-  ctx.strokeStyle = '#ffffffaa';
+  ctx.strokeStyle = '#e8ecff';
   ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.moveTo(0, HIT_Y); ctx.lineTo(W, HIT_Y); ctx.stroke();
+  ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.moveTo(highwayLeftAt(1), HIT_Y); ctx.lineTo(highwayLeftAt(1) + highwayWidthAt(1), HIT_Y); ctx.stroke();
+  ctx.shadowBlur = 0;
 
-  // Notas
+  // Notas: rombos brillantes que escalan con la profundidad (más grandes cerca)
   for (const n of notes) {
     const laneIdx = LANES.indexOf(n.ev.string);
     if (laneIdx === -1) continue;
@@ -276,35 +370,48 @@ function draw(songTime) {
     const y = timeToY(dt);
     if (y < -30 || y > H + 30) { if (dt < -HIT_WINDOW && !n.hit && !n.missed) n.missed = true; continue; }
     if (dt < -HIT_WINDOW && !n.hit && !n.missed) { n.missed = true; combo = 0; document.getElementById('comboEl').textContent = ''; }
-    const x = laneIdx * LANE_W + LANE_W / 2;
+    const k = depthAt(y);
+    const x = laneCenterXAt(laneIdx, k);
+    const size = 10 + 10 * k; // más grande cerca de la línea de impacto
+    const color = LANE_COLOR[n.ev.string];
+
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, 16, 0, Math.PI * 2);
-    ctx.fillStyle = n.hit ? '#5bd67c' : (n.missed ? '#442233' : LANE_COLOR[n.ev.string]);
-    ctx.globalAlpha = n.hit ? 0.35 : (n.missed ? 0.3 : 1);
-    ctx.fill();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
+    ctx.globalAlpha = n.hit ? 0.3 : (n.missed ? 0.25 : 1);
+    ctx.fillStyle = n.hit ? '#4dffb0' : (n.missed ? '#3a2a44' : color);
+    if (!n.hit && !n.missed) { ctx.shadowColor = color; ctx.shadowBlur = 14; }
+    ctx.fillRect(-size / 2, -size / 2, size, size);
     if (n.ev.approx && !n.hit && !n.missed) {
       ctx.setLineDash([4, 3]);
       ctx.lineWidth = 2;
-      ctx.strokeStyle = '#ffffffaa';
-      ctx.stroke();
+      ctx.strokeStyle = '#ffffffcc';
+      ctx.shadowBlur = 0;
+      ctx.strokeRect(-size / 2, -size / 2, size, size);
       ctx.setLineDash([]);
     }
     ctx.restore();
+
     if (!n.hit) {
-      ctx.fillStyle = '#10111a';
-      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = '#05040c';
+      ctx.font = `bold ${11 + 3 * k}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(n.ev.fret), x, y);
     }
   }
+
+  drawParticles();
 }
 
-function loop() {
+let lastFrameMs = null;
+function loop(nowMs) {
   if (!running) return;
+  const frameDt = lastFrameMs != null ? (nowMs - lastFrameMs) / 1000 : 0;
+  lastFrameMs = nowMs;
   const songTime = audioCtx.currentTime - startCtxTime;
   scheduleMetronome(songTime);
+  updateParticles(frameDt);
   draw(songTime);
   if (songTime > CHART.durationSec + NOTE_TRAVEL_SEC) {
     running = false;
