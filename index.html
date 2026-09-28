@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mi Cancionero</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:wght@400;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Courier+Prime:wght@400;700&family=Lato:wght@300;400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --paper: #fdf8f0;
@@ -816,6 +816,143 @@
     padding: 0 0.5rem;
     margin-bottom: 1rem;
   }
+
+  /* ── PROTOTIPO BETA (rediseño) ── */
+  .beta-overlay {
+    --b-bg: #f6f6fb;
+    --b-surface: #ffffff;
+    --b-ink: #1b1d29;
+    --b-ink-soft: #666a7d;
+    --b-accent: #6d5ef8;
+    --b-accent-soft: #ece8ff;
+    --b-border: #e7e7f2;
+    --b-chord: #0d9488;
+    --b-chord-soft: #e3f7f4;
+    position: fixed; inset: 0; z-index: 500;
+    background: var(--b-bg); color: var(--b-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow-y: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    .beta-overlay {
+      --b-bg: #14141c; --b-surface: #1d1e29; --b-ink: #f0f0f6; --b-ink-soft: #9a9dae;
+      --b-accent: #8b7dff; --b-accent-soft: #2a2447; --b-border: #2c2d3d;
+      --b-chord: #2dd4bf; --b-chord-soft: #16302d;
+    }
+  }
+  .beta-header {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 1.25rem;
+    padding: 0.9rem 1.5rem; background: color-mix(in srgb, var(--b-surface) 88%, transparent);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--b-border);
+  }
+  .beta-brand {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-weight: 800; font-size: 1.15rem; letter-spacing: -0.01em;
+    cursor: pointer; white-space: nowrap; color: var(--b-ink);
+  }
+  .beta-brand-mark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--b-accent), #a78bfa);
+    color: #fff; font-size: 1rem;
+  }
+  .beta-search { flex: 1; max-width: 480px; }
+  .beta-search input {
+    width: 100%; padding: 0.6rem 1rem; border-radius: 999px;
+    border: 1px solid var(--b-border); background: var(--b-bg); color: var(--b-ink);
+    font-family: inherit; font-size: 0.9rem; outline: none;
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .beta-search input:focus { border-color: var(--b-accent); box-shadow: 0 0 0 3px var(--b-accent-soft); }
+  .beta-close {
+    margin-left: auto; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--b-border); background: var(--b-surface); color: var(--b-ink-soft);
+    cursor: pointer; font-size: 0.9rem; flex-shrink: 0;
+  }
+  .beta-close:hover { color: var(--b-ink); border-color: var(--b-ink-soft); }
+  .beta-content { max-width: 880px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  .beta-hero { margin-bottom: 2rem; }
+  .beta-hero h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.35rem; }
+  .beta-hero p { color: var(--b-ink-soft); font-size: 0.95rem; margin: 0; }
+
+  .beta-section-label {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--b-ink-soft); margin: 2rem 0 0.9rem;
+  }
+  .beta-section-label:first-child { margin-top: 0; }
+
+  .beta-artist-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.9rem;
+  }
+  .beta-artist-card {
+    display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
+    padding: 1.2rem 0.75rem; border-radius: 16px; background: var(--b-surface);
+    border: 1px solid var(--b-border); cursor: pointer; text-align: center;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+  }
+  .beta-artist-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(30,20,80,0.08); border-color: var(--b-accent); }
+  .beta-artist-avatar {
+    width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 1.1rem; color: #fff;
+    background: linear-gradient(135deg, var(--b-accent), #a78bfa);
+  }
+  .beta-artist-name { font-weight: 600; font-size: 0.9rem; }
+  .beta-artist-count { font-size: 0.75rem; color: var(--b-ink-soft); }
+
+  .beta-song-row {
+    display: flex; align-items: center; gap: 0.9rem; padding: 0.85rem 1rem;
+    border-radius: 12px; cursor: pointer; transition: background 0.12s;
+  }
+  .beta-song-row:hover { background: var(--b-accent-soft); }
+  .beta-song-row + .beta-song-row { border-top: 1px solid var(--b-border); }
+  .beta-song-num { color: var(--b-ink-soft); font-size: 0.8rem; width: 1.5rem; text-align: right; flex-shrink: 0; }
+  .beta-song-title { font-weight: 600; font-size: 0.95rem; }
+  .beta-song-artist { color: var(--b-ink-soft); font-size: 0.82rem; margin-left: auto; }
+
+  .beta-crumb {
+    display: inline-flex; align-items: center; gap: 0.4rem; color: var(--b-ink-soft);
+    font-size: 0.85rem; cursor: pointer; margin-bottom: 1.2rem; font-weight: 500;
+  }
+  .beta-crumb:hover { color: var(--b-accent); }
+
+  .beta-song-header { margin-bottom: 1.5rem; }
+  .beta-song-header h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 0.2rem; }
+  .beta-song-header .beta-song-artist-name { color: var(--b-ink-soft); font-size: 1rem; font-weight: 500; }
+
+  .beta-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+  .beta-toolbar button {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.45rem 0.8rem; border-radius: 999px; border: 1px solid var(--b-border);
+    background: var(--b-surface); color: var(--b-ink); font-family: inherit; font-size: 0.85rem;
+    font-weight: 600; cursor: pointer; transition: border-color 0.12s, color 0.12s;
+  }
+  .beta-toolbar button:hover { border-color: var(--b-accent); color: var(--b-accent); }
+  .beta-toolbar .beta-transpose-value { font-size: 0.8rem; color: var(--b-ink-soft); font-weight: 600; min-width: 3.5rem; text-align: center; }
+
+  .beta-lyrics { font-size: 1.05rem; line-height: 2.4; }
+  .beta-lyric-line { min-height: 1.6em; }
+  .beta-section-tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--b-accent); background: var(--b-accent-soft); border-radius: 6px; padding: 0.15rem 0.55rem;
+    margin: 1.4rem 0 0.4rem;
+  }
+  .beta-chord-word { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: bottom; white-space: pre; }
+  .beta-chord-chip {
+    font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 700; color: var(--b-chord);
+    background: var(--b-chord-soft); border-radius: 5px; padding: 0.05rem 0.3rem; margin-bottom: 0.15rem;
+    line-height: 1.3; align-self: flex-start;
+  }
+  .beta-empty { color: var(--b-ink-soft); font-size: 0.9rem; padding: 2rem 0; text-align: center; }
+
+  @media (max-width: 640px) {
+    .beta-header { padding: 0.7rem 1rem; gap: 0.75rem; }
+    .beta-brand span:last-child { display: none; }
+    .beta-content { padding: 1.5rem 1rem 3rem; }
+    .beta-song-header h1 { font-size: 1.5rem; }
+  }
 </style>
 </head>
 <body>
@@ -843,6 +980,7 @@
     <button class="btn" id="btn-tab" onclick="toggleTab()">Tablatura</button>
     <button class="btn" id="btn-compose" onclick="toggleCompose()" title="Modo Componer">✎ Componer</button>
     <button class="btn" id="btn-tracks" onclick="toggleTracks()" title="Modo Pistas">🎙 Pistas</button>
+    <button class="btn" id="btn-beta" onclick="toggleBeta()" title="Prototipo del rediseño">🧪 Beta</button>
     <div class="sep"></div>
     <button class="btn" onclick="transpose(-1)">♭ −1</button>
     <button class="btn" onclick="transpose(1)">♯ +1</button>
@@ -879,6 +1017,21 @@
   <main class="main">
     <div id="mainContent"></div>
   </main>
+</div>
+
+<!-- ── PROTOTIPO BETA (rediseño) ── -->
+<div id="betaOverlay" class="beta-overlay" style="display:none;">
+  <header class="beta-header">
+    <div class="beta-brand" onclick="betaGoHome()">
+      <span class="beta-brand-mark">♪</span>
+      <span>Cancionero</span>
+    </div>
+    <div class="beta-search">
+      <input type="text" id="betaSearchInput" placeholder="Busca una canción o un artista…" oninput="betaOnSearch(this.value)">
+    </div>
+    <button class="beta-close" onclick="toggleBeta()" title="Salir del prototipo">✕</button>
+  </header>
+  <div id="betaContent" class="beta-content"></div>
 </div>
 
 <!-- Chord tooltip -->
@@ -2880,6 +3033,200 @@ window.addEventListener('resize', () => {
     applyMobileMode(isMobileDevice());
   }
 });
+
+// ── MODO BETA (prototipo del rediseño) ──────────────────────────────────────
+// Aislado a propósito: su propio overlay, su propio estado y su propio render.
+// No toca currentSong/songs ni el resto de la app — es un patio de pruebas
+// para desarrollar el diseño nuevo antes de decidir si sustituye al actual.
+let betaMode = false;
+let betaSongsFlat = null;      // array plano tal cual viene de seed-songs.json
+let betaByArtist = null;       // Map(artista -> [canciones])
+let betaLoadPromise = null;
+let betaView = { screen: 'home' }; // {screen:'home'} | {screen:'artist', artist} | {screen:'song', id} | {screen:'search', term}
+let betaTransposeAmount = 0;
+
+function toggleBeta() {
+  betaMode = !betaMode;
+  if (betaMode) {
+    if (composeMode) { composeMode = false; document.getElementById('btn-compose').classList.remove('active'); }
+    if (tracksMode) { tracksMode = false; document.getElementById('btn-tracks').classList.remove('active'); tracksStop(); }
+  }
+  document.getElementById('btn-beta').classList.toggle('active', betaMode);
+  document.getElementById('betaOverlay').style.display = betaMode ? 'block' : 'none';
+  if (betaMode) {
+    document.body.style.overflow = 'hidden';
+    betaView = { screen: 'home' };
+    document.getElementById('betaSearchInput').value = '';
+    renderBeta();
+    ensureBetaSongsLoaded().then(renderBeta);
+  } else {
+    document.body.style.overflow = mobileMode ? document.body.style.overflow : '';
+  }
+}
+
+async function ensureBetaSongsLoaded() {
+  if (betaSongsFlat) return betaSongsFlat;
+  if (betaLoadPromise) return betaLoadPromise;
+  betaLoadPromise = fetch('beta/seed-songs.json')
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(list => {
+      betaSongsFlat = list;
+      betaByArtist = new Map();
+      for (const s of list) {
+        if (!betaByArtist.has(s.artist)) betaByArtist.set(s.artist, []);
+        betaByArtist.get(s.artist).push(s);
+      }
+      return list;
+    })
+    .catch(e => {
+      console.error('No se pudieron cargar las canciones de prueba del prototipo Beta:', e);
+      betaSongsFlat = [];
+      betaByArtist = new Map();
+      return betaSongsFlat;
+    });
+  return betaLoadPromise;
+}
+
+function betaGoHome() {
+  betaView = { screen: 'home' };
+  document.getElementById('betaSearchInput').value = '';
+  renderBeta();
+}
+
+function betaOpenArtist(artist) {
+  betaView = { screen: 'artist', artist };
+  renderBeta();
+}
+
+function betaOpenSong(id) {
+  betaTransposeAmount = 0;
+  betaView = { screen: 'song', id };
+  renderBeta();
+}
+
+function betaOnSearch(term) {
+  const t = term.trim();
+  betaView = t ? { screen: 'search', term: t } : { screen: 'home' };
+  renderBeta();
+}
+
+function betaTranspose(delta) {
+  betaTransposeAmount += delta;
+  renderBeta();
+}
+
+function betaResetTranspose() {
+  betaTransposeAmount = 0;
+  renderBeta();
+}
+
+function betaArtistInitial(name) {
+  return (name || '?').trim().charAt(0).toUpperCase();
+}
+
+// Convierte el texto en formato [Acorde]letra (mismo formato que usa el resto
+// de la app) al marcado visual nuevo: acordes como chips sobre la palabra.
+function betaRenderLyrics(text, transposeAmount) {
+  const lines = parseLyrics(text || '');
+  let html = '';
+  for (const line of lines) {
+    if (line.type === 'section') {
+      html += `<div class="beta-section-tag">${escapeHtml(line.label)}</div>`;
+    } else if (line.type === 'empty') {
+      html += `<div class="beta-lyric-line">&nbsp;</div>`;
+    } else if (line.type === 'text') {
+      html += `<div class="beta-lyric-line">${escapeHtml(line.text)}</div>`;
+    } else if (line.type === 'chords') {
+      html += `<div class="beta-lyric-line">`;
+      for (const t of line.tokens) {
+        const chord = t.chord ? transposeChord(t.chord, transposeAmount) : '';
+        html += `<span class="beta-chord-word">`;
+        if (chord) html += `<span class="beta-chord-chip">${escapeHtml(chord)}</span>`;
+        html += `<span>${escapeHtml(t.text || (chord ? '' : ' '))}</span></span>`;
+      }
+      html += `</div>`;
+    }
+  }
+  return html || `<div class="beta-empty">Esta canción todavía no tiene letra.</div>`;
+}
+
+function renderBeta() {
+  const el = document.getElementById('betaContent');
+  if (!betaSongsFlat) {
+    el.innerHTML = `<div class="beta-empty">Cargando canciones de prueba…</div>`;
+    return;
+  }
+
+  if (betaView.screen === 'search') {
+    const term = betaView.term.toLowerCase();
+    const results = betaSongsFlat.filter(s =>
+      s.title.toLowerCase().includes(term) || s.artist.toLowerCase().includes(term));
+    el.innerHTML = `
+      <div class="beta-section-label">Resultados para «${escapeHtml(betaView.term)}»</div>
+      ${results.length
+        ? `<div>${results.map((s, i) => betaSongRowHTML(s, i)).join('')}</div>`
+        : `<div class="beta-empty">No hay canciones que coincidan.</div>`}`;
+    return;
+  }
+
+  if (betaView.screen === 'artist') {
+    const songsList = betaByArtist.get(betaView.artist) || [];
+    el.innerHTML = `
+      <div class="beta-crumb" onclick="betaGoHome()">← Todos los artistas</div>
+      <div class="beta-song-header"><h1>${escapeHtml(betaView.artist)}</h1>
+        <div class="beta-song-artist-name">${songsList.length} canción${songsList.length === 1 ? '' : 'es'}</div>
+      </div>
+      <div>${songsList.map((s, i) => betaSongRowHTML(s, i)).join('')}</div>`;
+    return;
+  }
+
+  if (betaView.screen === 'song') {
+    const song = betaSongsFlat.find(s => s.id === betaView.id);
+    if (!song) { el.innerHTML = `<div class="beta-empty">Canción no encontrada.</div>`; return; }
+    el.innerHTML = `
+      <div class="beta-crumb" onclick="betaOpenArtist('${escapeHtml(song.artist)}')">← ${escapeHtml(song.artist)}</div>
+      <div class="beta-song-header">
+        <h1>${escapeHtml(song.title)}</h1>
+        <div class="beta-song-artist-name">${escapeHtml(song.artist)}</div>
+      </div>
+      <div class="beta-toolbar">
+        <button onclick="betaTranspose(-1)">♭ Bajar</button>
+        <span class="beta-transpose-value">${betaTransposeAmount === 0 ? 'tono original' : (betaTransposeAmount > 0 ? '+' : '') + betaTransposeAmount + ' semitonos'}</span>
+        <button onclick="betaTranspose(1)">♯ Subir</button>
+        ${betaTransposeAmount !== 0 ? `<button onclick="betaResetTranspose()">↺ Reset</button>` : ''}
+      </div>
+      <div class="beta-lyrics">${betaRenderLyrics(song.lyrics, betaTransposeAmount)}</div>`;
+    return;
+  }
+
+  // Home
+  const artists = [...betaByArtist.keys()].sort((a, b) => a.localeCompare(b, 'es'));
+  el.innerHTML = `
+    <div class="beta-hero">
+      <h1>Prototipo del nuevo Cancionero</h1>
+      <p>Datos de prueba importados de La Cuerda para probar el diseño — de momento solo ${escapeHtml(String(betaSongsFlat.length))} canciones de ${escapeHtml(String(artists.length))} artista${artists.length === 1 ? '' : 's'}.</p>
+    </div>
+    <div class="beta-section-label">Artistas</div>
+    <div class="beta-artist-grid">
+      ${artists.map(a => `
+        <div class="beta-artist-card" onclick="betaOpenArtist('${escapeHtml(a)}')">
+          <div class="beta-artist-avatar">${escapeHtml(betaArtistInitial(a))}</div>
+          <div class="beta-artist-name">${escapeHtml(a)}</div>
+          <div class="beta-artist-count">${betaByArtist.get(a).length} canciones</div>
+        </div>`).join('')}
+    </div>
+    <div class="beta-section-label">Todas las canciones</div>
+    <div>${betaSongsFlat.map((s, i) => betaSongRowHTML(s, i)).join('')}</div>`;
+}
+
+function betaSongRowHTML(s, i) {
+  return `
+    <div class="beta-song-row" onclick="betaOpenSong('${escapeHtml(s.id)}')">
+      <span class="beta-song-num">${i + 1}</span>
+      <span class="beta-song-title">${escapeHtml(s.title)}</span>
+      <span class="beta-song-artist">${escapeHtml(s.artist)}</span>
+    </div>`;
+}
 </script>
 </body>
 </html>
