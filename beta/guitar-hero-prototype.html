@@ -23,7 +23,8 @@
   .hud .combo { color: #5bd67c; font-weight: 700; }
   #stage { position: relative; }
   canvas { background: var(--lane-bg); border-radius: 10px; border: 1px solid var(--line); display: block; }
-  .controls { margin-top: 0.75rem; display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+  .controls { margin-top: 0.75rem; display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .speed-label { font-size: 0.78rem; color: #9497ad; margin-left: 0.4rem; }
   button {
     background: #1d1f2e; color: #eef; border: 1px solid var(--line); border-radius: 8px;
     padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; font-weight: 600;
@@ -65,6 +66,9 @@
   <button onclick="startGame()">▶ Empezar</button>
   <button onclick="restartGame()">↺ Reiniciar</button>
   <button onclick="toggleMetronome()" id="metroBtn">🔊 Metrónomo: ON</button>
+  <button onclick="adjustSpeed(0.4)">🐢 Más lento</button>
+  <button onclick="adjustSpeed(-0.4)">🐇 Más rápido</button>
+  <span class="speed-label" id="speedLabel"></span>
 </div>
 
 <script>
@@ -81,8 +85,9 @@ const ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
 const LANE_W = W / LANES.length;
 const HIT_Y = H - 70;
-const NOTE_TRAVEL_SEC = 1.8; // cuánto tarda una nota en caer desde arriba hasta la línea
+let NOTE_TRAVEL_SEC = 3.2; // cuánto tarda una nota en caer desde arriba hasta la línea (más alto = más lento/fácil de leer)
 const HIT_WINDOW = 0.15; // ±150ms
+const STRING_THICKNESS = { E: 3, A: 2.6, D: 2.2, G: 1.8, B: 1.4, e: 1.1 }; // grave -> agudo, como cuerdas reales
 
 let audioCtx = null;
 let startCtxTime = 0;
@@ -124,6 +129,16 @@ function startGame() {
 }
 
 function restartGame() { running = false; startGame(); }
+
+function updateSpeedLabel() {
+  document.getElementById('speedLabel').textContent = NOTE_TRAVEL_SEC.toFixed(1) + 's en cruzar la pantalla';
+}
+
+function adjustSpeed(delta) {
+  NOTE_TRAVEL_SEC = Math.max(1.2, Math.min(6, NOTE_TRAVEL_SEC + delta));
+  updateSpeedLabel();
+}
+updateSpeedLabel();
 
 function toggleMetronome() {
   metronomeOn = !metronomeOn;
@@ -181,12 +196,25 @@ window.addEventListener('keydown', e => {
 let laneFlash = LANES.map(() => 0);
 function flashLane(i) { laneFlash[i] = 1; }
 
+function timeToY(dt) {
+  return HIT_Y - (dt / NOTE_TRAVEL_SEC) * HIT_Y;
+}
+
 function draw(songTime) {
   ctx.clearRect(0, 0, W, H);
-  // Carriles
+
+  // Fondo tipo mástil (madera oscura, más clara hacia el centro)
+  const wood = ctx.createLinearGradient(0, 0, W, 0);
+  wood.addColorStop(0, '#1b140f');
+  wood.addColorStop(0.5, '#241a12');
+  wood.addColorStop(1, '#1b140f');
+  ctx.fillStyle = wood;
+  ctx.fillRect(0, 0, W, H);
+
+  // Carriles (separación sutil entre cuerdas)
   for (let i = 0; i < LANES.length; i++) {
     const x = i * LANE_W;
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.045)';
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)';
     ctx.fillRect(x, 0, LANE_W, H);
     if (laneFlash[i] > 0) {
       ctx.fillStyle = `rgba(255,255,255,${0.18 * laneFlash[i]})`;
@@ -195,9 +223,49 @@ function draw(songTime) {
       if (laneFlash[i] < 0.02) laneFlash[i] = 0;
     }
   }
+
+  // Trastes: líneas horizontales que caen a la misma velocidad que las notas,
+  // uno por tiempo (beat), más marcado cada compás (4 tiempos) con incrustación.
+  const firstBeat = Math.floor((songTime - 0.5) / SEC_PER_BEAT);
+  const lastBeat = Math.ceil((songTime + NOTE_TRAVEL_SEC) / SEC_PER_BEAT);
+  for (let b = Math.max(0, firstBeat); b <= lastBeat; b++) {
+    const dt = b * SEC_PER_BEAT - songTime;
+    const y = timeToY(dt);
+    if (y < -10 || y > H + 10) continue;
+    const isMeasure = b % 4 === 0;
+    ctx.strokeStyle = isMeasure ? 'rgba(230,210,180,0.55)' : 'rgba(230,210,180,0.18)';
+    ctx.lineWidth = isMeasure ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    if (isMeasure) {
+      // incrustaciones tipo mástil real, en los carriles centrales
+      ctx.fillStyle = 'rgba(230,210,180,0.5)';
+      const midA = LANE_W * 2.5, midB = LANE_W * 3.5;
+      ctx.beginPath(); ctx.arc(midA, y, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(midB, y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // "Cuerdas": línea vertical central de cada carril, grosor según cuerda real
+  for (let i = 0; i < LANES.length; i++) {
+    const x = i * LANE_W + LANE_W / 2;
+    ctx.strokeStyle = 'rgba(210,215,225,0.35)';
+    ctx.lineWidth = STRING_THICKNESS[LANES[i]];
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+
+  // Nombre de cada cuerda, fijo arriba del todo
+  for (let i = 0; i < LANES.length; i++) {
+    const x = i * LANE_W + LANE_W / 2;
+    ctx.fillStyle = LANE_COLOR[LANES[i]];
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(LANES[i], x, 8);
+  }
+
   // Línea de impacto
-  ctx.strokeStyle = '#ffffff55';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#ffffffaa';
+  ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(0, HIT_Y); ctx.lineTo(W, HIT_Y); ctx.stroke();
 
   // Notas
@@ -205,7 +273,7 @@ function draw(songTime) {
     const laneIdx = LANES.indexOf(n.ev.string);
     if (laneIdx === -1) continue;
     const dt = n.ev.timeSec - songTime;
-    const y = HIT_Y - (dt / NOTE_TRAVEL_SEC) * HIT_Y;
+    const y = timeToY(dt);
     if (y < -30 || y > H + 30) { if (dt < -HIT_WINDOW && !n.hit && !n.missed) n.missed = true; continue; }
     if (dt < -HIT_WINDOW && !n.hit && !n.missed) { n.missed = true; combo = 0; document.getElementById('comboEl').textContent = ''; }
     const x = laneIdx * LANE_W + LANE_W / 2;
