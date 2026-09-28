@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prototipo: Guitar Hero desde tablatura</title>
+<style>
+  :root {
+    --bg: #0d0e16; --lane-bg: #14151f; --line: #262838;
+    --hit: #ffffff; --miss: #ff5566; --good: #5bd67c;
+    --str-e: #ff6b6b; --str-B: #ffb347; --str-G: #ffe45e; --str-D: #6bffb0; --str-A: #5ec8ff; --str-E: #b98bff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: #eef; font-family: 'Segoe UI', Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 1rem;
+  }
+  h1 { font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0 0.1rem; }
+  .subtitle { font-size: 0.78rem; color: #9497ad; margin-bottom: 0.75rem; text-align: center; max-width: 640px; }
+  .subtitle b { color: #ffb347; }
+  .hud { display: flex; gap: 1.5rem; align-items: center; margin-bottom: 0.6rem; font-size: 0.85rem; }
+  .hud .score { font-size: 1.3rem; font-weight: 800; }
+  .hud .combo { color: #5bd67c; font-weight: 700; }
+  #stage { position: relative; }
+  canvas { background: var(--lane-bg); border-radius: 10px; border: 1px solid var(--line); display: block; }
+  .controls { margin-top: 0.75rem; display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+  button {
+    background: #1d1f2e; color: #eef; border: 1px solid var(--line); border-radius: 8px;
+    padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; font-weight: 600;
+  }
+  button:hover { border-color: #5ec8ff; }
+  .keys-hint { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+  .key-chip {
+    width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; color: #10111a; border: 2px solid transparent;
+  }
+  .legend { display:flex; gap:1rem; margin-top:0.6rem; font-size:0.72rem; color:#9497ad; flex-wrap:wrap; justify-content:center; }
+  .legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:0.3rem; vertical-align:middle; }
+</style>
+</head>
+<body>
+<h1>🎸 Prototipo — Guitar Hero desde tablatura</h1>
+<div class="subtitle">
+  Prueba de viabilidad: notas generadas automáticamente a partir de una tablatura ASCII real
+  (tramo inicial de "Te Quiero", de La Cuerda), sin audio de la canción de por medio.
+  Las notas con borde <b>discontinuo</b> caen en tramos del tab sin barra de compás que los cierre —
+  su tiempo es una aproximación, no un dato calibrado.
+</div>
+
+<div class="hud">
+  <div class="score" id="scoreEl">0</div>
+  <div class="combo" id="comboEl"></div>
+  <div id="statusEl" style="color:#9497ad;">Pulsa Empezar</div>
+</div>
+
+<div id="stage">
+  <canvas id="cv" width="480" height="560"></canvas>
+</div>
+
+<div class="keys-hint" id="keysHint"></div>
+
+<div class="legend" id="legend"></div>
+
+<div class="controls">
+  <button onclick="startGame()">▶ Empezar</button>
+  <button onclick="restartGame()">↺ Reiniciar</button>
+  <button onclick="toggleMetronome()" id="metroBtn">🔊 Metrónomo: ON</button>
+</div>
+
+<script>
+// ── Datos: chart generado desde la tablatura real (ver tab2chart.js) ──────
+const CHART = {"durationSec":8.192,"events":[{"timeSec":0.094,"string":"A","fret":0,"approx":false},{"timeSec":0.188,"string":"A","fret":2,"approx":false},{"timeSec":0.283,"string":"D","fret":0,"approx":false},{"timeSec":0.424,"string":"D","fret":0,"approx":false},{"timeSec":0.518,"string":"D","fret":0,"approx":false},{"timeSec":0.754,"string":"A","fret":0,"approx":false},{"timeSec":0.848,"string":"A","fret":2,"approx":false},{"timeSec":0.942,"string":"D","fret":0,"approx":false},{"timeSec":1.083,"string":"D","fret":0,"approx":false},{"timeSec":1.177,"string":"D","fret":0,"approx":false},{"timeSec":1.413,"string":"A","fret":0,"approx":false},{"timeSec":1.507,"string":"A","fret":2,"approx":false},{"timeSec":1.601,"string":"D","fret":0,"approx":false},{"timeSec":1.695,"string":"A","fret":0,"approx":false},{"timeSec":1.79,"string":"A","fret":2,"approx":false},{"timeSec":1.884,"string":"D","fret":0,"approx":false},{"timeSec":1.978,"string":"A","fret":0,"approx":false},{"timeSec":2.072,"string":"A","fret":2,"approx":false},{"timeSec":2.166,"string":"D","fret":0,"approx":false},{"timeSec":2.423,"string":"A","fret":0,"approx":false},{"timeSec":2.538,"string":"A","fret":2,"approx":false},{"timeSec":2.654,"string":"D","fret":0,"approx":false},{"timeSec":2.942,"string":"A","fret":0,"approx":false},{"timeSec":3.058,"string":"A","fret":2,"approx":false},{"timeSec":3.173,"string":"D","fret":4,"approx":false},{"timeSec":3.462,"string":"D","fret":4,"approx":false},{"timeSec":3.577,"string":"D","fret":2,"approx":false},{"timeSec":3.75,"string":"E","fret":2,"approx":false},{"timeSec":3.865,"string":"E","fret":2,"approx":false},{"timeSec":4.038,"string":"A","fret":4,"approx":false},{"timeSec":4.154,"string":"A","fret":4,"approx":false},{"timeSec":4.327,"string":"E","fret":2,"approx":false},{"timeSec":4.442,"string":"E","fret":2,"approx":false},{"timeSec":4.788,"string":"A","fret":4,"approx":true},{"timeSec":4.904,"string":"A","fret":2,"approx":true},{"timeSec":5.019,"string":"A","fret":0,"approx":true},{"timeSec":5.135,"string":"E","fret":3,"approx":true},{"timeSec":5.25,"string":"E","fret":3,"approx":true},{"timeSec":5.538,"string":"E","fret":3,"approx":true},{"timeSec":5.654,"string":"A","fret":2,"approx":true},{"timeSec":5.769,"string":"D","fret":0,"approx":true},{"timeSec":5.885,"string":"A","fret":0,"approx":true},{"timeSec":6,"string":"A","fret":0,"approx":true},{"timeSec":6.288,"string":"A","fret":0,"approx":true},{"timeSec":6.404,"string":"A","fret":2,"approx":true},{"timeSec":6.519,"string":"A","fret":4,"approx":true},{"timeSec":6.635,"string":"D","fret":0,"approx":true},{"timeSec":6.75,"string":"D","fret":0,"approx":true},{"timeSec":6.865,"string":"D","fret":0,"approx":true},{"timeSec":6.981,"string":"D","fret":2,"approx":true},{"timeSec":7.096,"string":"D","fret":4,"approx":true},{"timeSec":7.212,"string":"D","fret":2,"approx":true},{"timeSec":7.327,"string":"A","fret":0,"approx":true},{"timeSec":7.442,"string":"A","fret":0,"approx":true},{"timeSec":7.558,"string":"A","fret":0,"approx":true},{"timeSec":7.673,"string":"A","fret":0,"approx":true},{"timeSec":7.788,"string":"A","fret":2,"approx":true},{"timeSec":7.904,"string":"A","fret":4,"approx":true},{"timeSec":8.019,"string":"D","fret":0,"approx":true}]};
+
+// Orden visual de carriles (grave -> agudo, como en un mástil real)
+const LANES = ['E', 'A', 'D', 'G', 'B', 'e'];
+const LANE_COLOR = { E: '#b98bff', A: '#5ec8ff', D: '#6bffb0', G: '#ffe45e', B: '#ffb347', e: '#ff6b6b' };
+const KEYS = ['a', 's', 'd', 'f', 'g', 'h']; // una tecla por carril, mismo orden que LANES
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const LANE_W = W / LANES.length;
+const HIT_Y = H - 70;
+const NOTE_TRAVEL_SEC = 1.8; // cuánto tarda una nota en caer desde arriba hasta la línea
+const HIT_WINDOW = 0.15; // ±150ms
+
+let audioCtx = null;
+let startCtxTime = 0;
+let running = false;
+let metronomeOn = true;
+let score = 0, combo = 0, maxCombo = 0;
+let notes = []; // {ev, hit:boolean, missed:boolean}
+let lastBeatScheduled = -1;
+const SEC_PER_BEAT = 60 / 104; // mismo BPM asumido que en el generador del chart
+
+function resetState() {
+  score = 0; combo = 0; maxCombo = 0;
+  notes = CHART.events.map(ev => ({ ev, hit: false, missed: false }));
+  document.getElementById('scoreEl').textContent = '0';
+  document.getElementById('comboEl').textContent = '';
+  document.getElementById('statusEl').textContent = 'Pulsa Empezar';
+}
+resetState();
+
+function buildLegend() {
+  const hint = document.getElementById('keysHint');
+  const legend = document.getElementById('legend');
+  hint.innerHTML = LANES.map((l, i) => `<div class="key-chip" style="background:${LANE_COLOR[l]}">${KEYS[i].toUpperCase()}</div>`).join('');
+  legend.innerHTML = LANES.map(l => `<span><span class="dot" style="background:${LANE_COLOR[l]}"></span>cuerda ${l}</span>`).join('')
+    + `<span>┄ borde discontinuo = tiempo aproximado (sin barra de compás)</span>`;
+}
+buildLegend();
+
+function startGame() {
+  if (running) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  resetState();
+  running = true;
+  startCtxTime = audioCtx.currentTime + 0.3;
+  lastBeatScheduled = -1;
+  document.getElementById('statusEl').textContent = 'Tocando…';
+  requestAnimationFrame(loop);
+}
+
+function restartGame() { running = false; startGame(); }
+
+function toggleMetronome() {
+  metronomeOn = !metronomeOn;
+  document.getElementById('metroBtn').textContent = '🔊 Metrónomo: ' + (metronomeOn ? 'ON' : 'OFF');
+}
+
+function playClick(strong) {
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.frequency.value = strong ? 1400 : 900;
+  g.gain.value = 0.15;
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+  o.connect(g).connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime + 0.06);
+}
+
+function scheduleMetronome(songTime) {
+  if (!metronomeOn) return;
+  const beatIdx = Math.floor(songTime / SEC_PER_BEAT);
+  if (beatIdx > lastBeatScheduled && beatIdx >= 0) {
+    lastBeatScheduled = beatIdx;
+    playClick(beatIdx % 4 === 0);
+  }
+}
+
+function judge(laneIdx) {
+  const string = LANES[laneIdx];
+  const songTime = audioCtx.currentTime - startCtxTime;
+  let best = null, bestDiff = Infinity;
+  for (const n of notes) {
+    if (n.hit || n.missed || n.ev.string !== string) continue;
+    const diff = Math.abs(n.ev.timeSec - songTime);
+    if (diff < bestDiff) { bestDiff = diff; best = n; }
+  }
+  if (best && bestDiff <= HIT_WINDOW) {
+    best.hit = true;
+    combo++; maxCombo = Math.max(maxCombo, combo);
+    score += Math.round(100 * (1 - bestDiff / HIT_WINDOW)) + combo;
+  } else {
+    combo = 0;
+  }
+  document.getElementById('scoreEl').textContent = score;
+  document.getElementById('comboEl').textContent = combo > 1 ? combo + 'x combo' : '';
+}
+
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const idx = KEYS.indexOf(e.key.toLowerCase());
+  if (idx === -1 || !running) return;
+  flashLane(idx);
+  judge(idx);
+});
+
+let laneFlash = LANES.map(() => 0);
+function flashLane(i) { laneFlash[i] = 1; }
+
+function draw(songTime) {
+  ctx.clearRect(0, 0, W, H);
+  // Carriles
+  for (let i = 0; i < LANES.length; i++) {
+    const x = i * LANE_W;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.045)';
+    ctx.fillRect(x, 0, LANE_W, H);
+    if (laneFlash[i] > 0) {
+      ctx.fillStyle = `rgba(255,255,255,${0.18 * laneFlash[i]})`;
+      ctx.fillRect(x, 0, LANE_W, H);
+      laneFlash[i] *= 0.85;
+      if (laneFlash[i] < 0.02) laneFlash[i] = 0;
+    }
+  }
+  // Línea de impacto
+  ctx.strokeStyle = '#ffffff55';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, HIT_Y); ctx.lineTo(W, HIT_Y); ctx.stroke();
+
+  // Notas
+  for (const n of notes) {
+    const laneIdx = LANES.indexOf(n.ev.string);
+    if (laneIdx === -1) continue;
+    const dt = n.ev.timeSec - songTime;
+    const y = HIT_Y - (dt / NOTE_TRAVEL_SEC) * HIT_Y;
+    if (y < -30 || y > H + 30) { if (dt < -HIT_WINDOW && !n.hit && !n.missed) n.missed = true; continue; }
+    if (dt < -HIT_WINDOW && !n.hit && !n.missed) { n.missed = true; combo = 0; document.getElementById('comboEl').textContent = ''; }
+    const x = laneIdx * LANE_W + LANE_W / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 16, 0, Math.PI * 2);
+    ctx.fillStyle = n.hit ? '#5bd67c' : (n.missed ? '#442233' : LANE_COLOR[n.ev.string]);
+    ctx.globalAlpha = n.hit ? 0.35 : (n.missed ? 0.3 : 1);
+    ctx.fill();
+    if (n.ev.approx && !n.hit && !n.missed) {
+      ctx.setLineDash([4, 3]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffffaa';
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+    if (!n.hit) {
+      ctx.fillStyle = '#10111a';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(n.ev.fret), x, y);
+    }
+  }
+}
+
+function loop() {
+  if (!running) return;
+  const songTime = audioCtx.currentTime - startCtxTime;
+  scheduleMetronome(songTime);
+  draw(songTime);
+  if (songTime > CHART.durationSec + NOTE_TRAVEL_SEC) {
+    running = false;
+    document.getElementById('statusEl').textContent =
+      `Terminado — puntuación ${score}, combo máximo ${maxCombo}`;
+    return;
+  }
+  requestAnimationFrame(loop);
+}
+
+draw(-NOTE_TRAVEL_SEC);
+</script>
+</body>
+</html>
