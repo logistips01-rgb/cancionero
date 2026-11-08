@@ -1,5 +1,30 @@
 # Hoja de ruta — Guitle AI
 
+## Antes de publicarlo en la web real de venta de guitarras
+
+- **Cambiar la canción de demo**: Sultans of Swing (con copyright) vale para
+  pruebas internas, pero no puede ser lo que vea un cliente real sin
+  licencia. Sustituir por dominio público, royalty-free, o una demo grabada
+  por la propia tienda tocando una guitarra del catálogo (esto último sirve
+  también de promoción directa).
+- **Aviso de marca**: añadir una línea pequeña tipo "Guitle AI no está
+  afiliado con Guitar Hero® ni Activision".
+- **Versión táctil/móvil**: hoy solo se juega con teclado (A S D F G H +
+  Espacio) y el lienzo es de tamaño fijo (480x560px) — la mayoría de
+  visitantes de una tienda entrarán desde el móvil, así que hace falta
+  una interfaz táctil (botones en pantalla) y un lienzo que se adapte al
+  tamaño de pantalla antes de que esto sea un buen reclamo real.
+- **Hosting de verdad**: el enlace de pruebas (raw.githack.com) es solo
+  para desarrollo entre nosotros — para producción hay que alojarlo en el
+  hosting propio de la tienda o en Firebase junto al resto de Cancionero.
+- **No publicar todavía el buscador de canciones** (ver más abajo, sigue
+  en fase futura) — exponerlo a clientes reales antes de resolver bien la
+  fuente del MIDI y los casos sin resultado daría mala impresión.
+- Insertarlo como página/sección aparte (no en el menú principal), con un
+  botón tipo "Prueba nuestras guitarras con IA", idealmente en un iframe
+  aislado del resto de la web para que un fallo del juego no afecte a la
+  tienda.
+
 Marca del producto: **Guitle AI** (antes "Guitar Hero" / "Guitle Game" —
 renombrado para no usar la marca registrada de Activision). Dos líneas de
 producto bajo el mismo nombre, con requisitos legales distintos:
