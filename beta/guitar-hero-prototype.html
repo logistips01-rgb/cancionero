@@ -227,7 +227,7 @@ resetState();
 function buildLegend() {
   const hint = document.getElementById('keysHint');
   const legend = document.getElementById('legend');
-  hint.innerHTML = LANES.map((l, i) => `<div class="key-chip" style="background:${LANE_COLOR[l]}">${KEYS[i].toUpperCase()}</div>`).join('');
+  hint.innerHTML = LANES.map((l, i) => `<div class="key-chip" style="background:${LANE_COLOR[l]}">${l}</div>`).join('');
   legend.innerHTML = LANES.map(l => `<span><span class="dot" style="background:${LANE_COLOR[l]}"></span>cuerda ${l}</span>`).join('');
 }
 buildLegend();
