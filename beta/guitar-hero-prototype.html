@@ -30,15 +30,25 @@
   }
   .hud .score { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(0,229,255,0.6); }
   .hud .combo { color: var(--good); font-weight: 700; text-shadow: 0 0 8px rgba(77,255,176,0.6); }
-  #stage { position: relative; }
+  #stage { position: relative; padding-bottom: 64px; }
   .play-row { display: flex; align-items: flex-start; gap: 1rem; }
   .chord-panel {
     width: 150px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px;
-    padding: 0.7rem; text-align: center;
+    padding: 0.7rem; text-align: center; align-self: flex-start;
   }
   .chord-title { font-size: 0.8rem; font-weight: 600; color: #e8ecff; }
-  .chord-hint { font-size: 0.64rem; color: #9ba3d0; margin: 0.15rem 0 0.6rem; }
-  .chord-diagram-body.empty { font-size: 0.7rem; color: #5a5f80; font-style: italic; padding: 2.2rem 0; }
+  .chord-hint { font-size: 0.62rem; color: #9ba3d0; margin: 0.15rem 0 0.6rem; line-height: 1.3; }
+  .chord-queue { display: flex; flex-direction: column; gap: 0.5rem; max-height: 480px; overflow-y: auto; }
+  .chord-empty { font-size: 0.7rem; color: #5a5f80; font-style: italic; padding: 2.2rem 0; }
+  .chord-item { border-radius: 10px; border: 2px solid transparent; padding: 2px; }
+  .chord-item.active {
+    border-color: var(--good); background: rgba(77,255,176,0.14); box-shadow: 0 0 10px rgba(77,255,176,0.4);
+  }
+  .chord-item.warn { animation: chordBlink 0.5s steps(1, start) infinite; }
+  @keyframes chordBlink {
+    0%, 49% { border-color: var(--good); background: rgba(77,255,176,0.14); box-shadow: 0 0 10px rgba(77,255,176,0.4); }
+    50%, 100% { border-color: transparent; background: transparent; box-shadow: none; }
+  }
   canvas {
     background: #05040c; border-radius: 14px; display: block;
     border: 1px solid var(--panel-line);
@@ -55,7 +65,7 @@
     padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; font-weight: 600; transition: all 0.15s;
   }
   button:hover { border-color: #00e5ff; box-shadow: 0 0 14px rgba(0,229,255,0.35); color: #00e5ff; }
-  .keys-hint { position: relative; margin-top: 0.8rem; }
+  .keys-hint { position: absolute; left: 0; }
   .key-chip {
     position: absolute; top: 0; width: 42px; height: 42px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;
     font-weight: 800; font-size: 1.05rem; color: #05040c; border: 2px solid transparent; line-height: 1.05;
@@ -93,15 +103,14 @@
 <div class="play-row">
   <div id="stage">
     <canvas id="cv" width="480" height="560"></canvas>
+    <div class="keys-hint" id="keysHint"></div>
   </div>
   <div class="chord-panel">
-    <div class="chord-title">🎼 Acorde</div>
-    <div class="chord-hint">Pulsa <b>Espacio</b> para rasguearlo entero</div>
-    <div id="chordDiagramBody" class="chord-diagram-body empty">Sin acorde próximo</div>
+    <div class="chord-title">🎼 Acordes</div>
+    <div class="chord-hint">Pulsa <b>Espacio</b> para rasguear — parpadea cuando se acerca, se pone verde cuando toca</div>
+    <div id="chordQueue" class="chord-queue"><div class="chord-empty">Sin acordes</div></div>
   </div>
 </div>
-
-<div class="keys-hint" id="keysHint"></div>
 
 <div class="legend" id="legend"></div>
 
@@ -230,7 +239,7 @@ let sharedNoiseBuffer = null;
 let score = 0, combo = 0, maxCombo = 0;
 let notes = []; // {ev, hit:boolean, missed:boolean}
 let chordGroups = []; // {timeSec, members:[nota,...]} — notas simultáneas (acordes reales, 2+ cuerdas a la vez)
-let shownChordGroup = null; // qué acorde se muestra ahora mismo en el panel lateral
+let lastChordQueueSignature = ''; // para no redibujar la cola de acordes si no ha cambiado
 let lastBeatScheduled = -1;
 let SEC_PER_BEAT = 60 / INSTRUMENT_PROFILES[currentInstrumentKey].bpm; // BPM del perfil activo
 
@@ -251,8 +260,8 @@ function resetState() {
   score = 0; combo = 0; maxCombo = 0;
   notes = CHART.events.map(ev => ({ ev, hit: false, missed: false }));
   chordGroups = buildChordGroups(notes);
-  shownChordGroup = null;
-  renderChordPanel(null);
+  lastChordQueueSignature = '';
+  renderChordQueue([], null, null);
   document.getElementById('scoreEl').textContent = '0';
   document.getElementById('comboEl').textContent = '';
   document.getElementById('statusEl').textContent = 'Pulsa Empezar';
@@ -264,6 +273,8 @@ function buildLegend() {
   const legend = document.getElementById('legend');
   hint.style.width = W + 'px';
   hint.style.height = '46px';
+  hint.style.top = (H + 14) + 'px';
+  hint.style.left = '0';
   hint.innerHTML = LANES.map((l, i) => {
     const x = laneCenterXAt(i, 1) - 21; // centra el chip de 42px bajo la cuerda real
     const label = l === 'e' ? '<span class="chip-e">e</span>' : l;
@@ -276,15 +287,7 @@ buildLegend();
 // Diagrama de acorde tipo "chord chart" real: cuerdas de izquierda (grave) a
 // derecha (aguda), trastes como filas, punto donde va cada dedo, "x" en las
 // cuerdas que ese acorde no toca. Así se ve la forma de mano antes de que llegue.
-function renderChordPanel(group) {
-  const body = document.getElementById('chordDiagramBody');
-  if (!body) return;
-  if (!group) {
-    body.classList.add('empty');
-    body.innerHTML = 'Sin acorde próximo';
-    return;
-  }
-  body.classList.remove('empty');
+function chordSvgMarkup(group) {
   const posByString = new Map(group.members.map(m => [m.ev.string, m.ev.fret]));
   const usedFrets = group.members.map(m => m.ev.fret).filter(f => f > 0);
   const minFret = usedFrets.length ? Math.min(...usedFrets) : 0;
@@ -326,7 +329,23 @@ function renderChordPanel(group) {
     }
   }
   svg += `</svg>`;
-  body.innerHTML = svg;
+  return svg;
+}
+
+// Cola de acordes a la derecha: todos los próximos a la vez (no uno sustituyendo
+// al otro). El que toca ahora se pone verde fijo; el siguiente, justo antes de
+// que llegue, parpadea en verde como aviso para cambiar de forma de mano.
+function renderChordQueue(list, active, warn) {
+  const box = document.getElementById('chordQueue');
+  if (!box) return;
+  if (!list.length) {
+    box.innerHTML = '<div class="chord-empty">Sin acordes</div>';
+    return;
+  }
+  box.innerHTML = list.map(g => {
+    const cls = g === active ? 'active' : (g === warn ? 'warn' : '');
+    return `<div class="chord-item ${cls}">${chordSvgMarkup(g)}</div>`;
+  }).join('');
 }
 
 function buildTrackToggles() {
@@ -726,11 +745,18 @@ function draw(songTime) {
   ctx.beginPath(); ctx.moveTo(highwayLeftAt(1), HIT_Y); ctx.lineTo(highwayLeftAt(1) + highwayWidthAt(1), HIT_Y); ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Panel lateral: qué acorde viene ahora (o está sonando), para ver la mano con tiempo
-  const nextChord = chordGroups.find(g => g.timeSec >= songTime - HIT_WINDOW && g.members.some(m => !m.hit && !m.missed));
-  if ((nextChord || null) !== shownChordGroup) {
-    shownChordGroup = nextChord || null;
-    renderChordPanel(shownChordGroup);
+  // Panel lateral: todos los próximos acordes a la vez (no uno sustituyendo al
+  // otro). El que toca ahora mismo se pone verde fijo; el que viene justo
+  // después parpadea en verde 0.6s antes de llegar, como aviso para cambiar de mano.
+  const CHORD_WARN_LEAD_SEC = 0.6;
+  const pendingChords = chordGroups.filter(g => g.timeSec >= songTime - HIT_WINDOW && g.members.some(m => !m.hit && !m.missed));
+  const visibleChords = pendingChords.slice(0, 4);
+  const activeChord = visibleChords.find(g => Math.abs(g.timeSec - songTime) <= HIT_WINDOW) || null;
+  const warnChord = visibleChords.find(g => g !== activeChord && g.timeSec - songTime > 0 && g.timeSec - songTime <= CHORD_WARN_LEAD_SEC) || null;
+  const chordQueueSignature = visibleChords.map(g => g.timeSec).join(',') + '|' + (activeChord ? activeChord.timeSec : '') + '|' + (warnChord ? warnChord.timeSec : '');
+  if (chordQueueSignature !== lastChordQueueSignature) {
+    lastChordQueueSignature = chordQueueSignature;
+    renderChordQueue(visibleChords, activeChord, warnChord);
   }
 
   // Conectores de acorde: una barra blanca que une las notas que se tocan juntas,
