@@ -57,9 +57,10 @@
   button:hover { border-color: #00e5ff; box-shadow: 0 0 14px rgba(0,229,255,0.35); color: #00e5ff; }
   .keys-hint { display: flex; gap: 0.5rem; margin-top: 0.8rem; }
   .key-chip {
-    width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 0.85rem; color: #05040c; border: 2px solid transparent;
+    width: 42px; height: 42px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1.05rem; color: #05040c; border: 2px solid transparent; line-height: 1.05;
   }
+  .key-chip .chip-key { font-size: 0.58rem; font-weight: 700; opacity: 0.75; }
   .legend { display:flex; gap:1rem; margin-top:0.7rem; font-size:0.72rem; color:#9ba3d0; flex-wrap:wrap; justify-content:center; max-width:520px; }
   .legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:0.3rem; vertical-align:middle; box-shadow: 0 0 6px currentColor; }
 </style>
@@ -260,7 +261,7 @@ resetState();
 function buildLegend() {
   const hint = document.getElementById('keysHint');
   const legend = document.getElementById('legend');
-  hint.innerHTML = LANES.map((l, i) => `<div class="key-chip" style="background:${LANE_COLOR[l]}">${l}</div>`).join('');
+  hint.innerHTML = LANES.map((l, i) => `<div class="key-chip" style="background:${LANE_COLOR[l]}">${l}<span class="chip-key">${KEYS[i].toUpperCase()}</span></div>`).join('');
   legend.innerHTML = LANES.map(l => `<span><span class="dot" style="background:${LANE_COLOR[l]}"></span>cuerda ${l}</span>`).join('');
 }
 buildLegend();
