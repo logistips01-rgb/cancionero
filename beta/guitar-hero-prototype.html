@@ -31,6 +31,14 @@
   .hud .score { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(0,229,255,0.6); }
   .hud .combo { color: var(--good); font-weight: 700; text-shadow: 0 0 8px rgba(77,255,176,0.6); }
   #stage { position: relative; }
+  .play-row { display: flex; align-items: flex-start; gap: 1rem; }
+  .chord-panel {
+    width: 150px; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 14px;
+    padding: 0.7rem; text-align: center;
+  }
+  .chord-title { font-size: 0.8rem; font-weight: 600; color: #e8ecff; }
+  .chord-hint { font-size: 0.64rem; color: #9ba3d0; margin: 0.15rem 0 0.6rem; }
+  .chord-diagram-body.empty { font-size: 0.7rem; color: #5a5f80; font-style: italic; padding: 2.2rem 0; }
   canvas {
     background: #05040c; border-radius: 14px; display: block;
     border: 1px solid var(--panel-line);
@@ -80,8 +88,15 @@
   <div id="statusEl" style="color:#9497ad;">Pulsa Empezar</div>
 </div>
 
-<div id="stage">
-  <canvas id="cv" width="480" height="560"></canvas>
+<div class="play-row">
+  <div id="stage">
+    <canvas id="cv" width="480" height="560"></canvas>
+  </div>
+  <div class="chord-panel">
+    <div class="chord-title">🎼 Acorde</div>
+    <div class="chord-hint">Pulsa <b>Espacio</b> para rasguearlo entero</div>
+    <div id="chordDiagramBody" class="chord-diagram-body empty">Sin acorde próximo</div>
+  </div>
 </div>
 
 <div class="keys-hint" id="keysHint"></div>
@@ -212,12 +227,30 @@ const MUSIC_SCHEDULE_INTERVAL_MS = 200;
 let sharedNoiseBuffer = null;
 let score = 0, combo = 0, maxCombo = 0;
 let notes = []; // {ev, hit:boolean, missed:boolean}
+let chordGroups = []; // {timeSec, members:[nota,...]} — notas simultáneas (acordes reales, 2+ cuerdas a la vez)
+let shownChordGroup = null; // qué acorde se muestra ahora mismo en el panel lateral
 let lastBeatScheduled = -1;
 let SEC_PER_BEAT = 60 / INSTRUMENT_PROFILES[currentInstrumentKey].bpm; // BPM del perfil activo
+
+// Agrupa notas que caen en el mismo instante (±20ms) en acordes reales (2+ cuerdas a la vez).
+// Las notas sueltas (grupo de 1) no cambian: se siguen tocando con su tecla de carril normal.
+function buildChordGroups(noteObjs) {
+  const sorted = [...noteObjs].sort((a, b) => a.ev.timeSec - b.ev.timeSec);
+  const groups = [];
+  for (const n of sorted) {
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(last.timeSec - n.ev.timeSec) < 0.02) last.members.push(n);
+    else groups.push({ timeSec: n.ev.timeSec, members: [n] });
+  }
+  return groups.filter(g => g.members.length > 1);
+}
 
 function resetState() {
   score = 0; combo = 0; maxCombo = 0;
   notes = CHART.events.map(ev => ({ ev, hit: false, missed: false }));
+  chordGroups = buildChordGroups(notes);
+  shownChordGroup = null;
+  renderChordPanel(null);
   document.getElementById('scoreEl').textContent = '0';
   document.getElementById('comboEl').textContent = '';
   document.getElementById('statusEl').textContent = 'Pulsa Empezar';
@@ -231,6 +264,62 @@ function buildLegend() {
   legend.innerHTML = LANES.map(l => `<span><span class="dot" style="background:${LANE_COLOR[l]}"></span>cuerda ${l}</span>`).join('');
 }
 buildLegend();
+
+// Diagrama de acorde tipo "chord chart" real: cuerdas de izquierda (grave) a
+// derecha (aguda), trastes como filas, punto donde va cada dedo, "x" en las
+// cuerdas que ese acorde no toca. Así se ve la forma de mano antes de que llegue.
+function renderChordPanel(group) {
+  const body = document.getElementById('chordDiagramBody');
+  if (!body) return;
+  if (!group) {
+    body.classList.add('empty');
+    body.innerHTML = 'Sin acorde próximo';
+    return;
+  }
+  body.classList.remove('empty');
+  const posByString = new Map(group.members.map(m => [m.ev.string, m.ev.fret]));
+  const usedFrets = group.members.map(m => m.ev.fret).filter(f => f > 0);
+  const minFret = usedFrets.length ? Math.min(...usedFrets) : 0;
+  const baseFret = minFret <= 4 ? 0 : minFret - 1;
+  const numFrets = 4;
+
+  const nStrings = LANES.length;
+  const svgW = 120, gridH = 96, marginX = 14, marginTop = 24;
+  const svgH = marginTop + gridH + 10;
+  const stepX = nStrings > 1 ? (svgW - marginX * 2) / (nStrings - 1) : 0;
+  const stepY = gridH / numFrets;
+
+  let svg = `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
+  if (baseFret === 0) {
+    svg += `<rect x="${marginX}" y="${marginTop}" width="${svgW - marginX * 2}" height="3" fill="#e8ecff"/>`;
+  } else {
+    svg += `<text x="1" y="${marginTop + stepY / 2 + 4}" font-size="9" fill="#9ba3d0">${baseFret + 1}</text>`;
+  }
+  for (let f = 1; f <= numFrets; f++) {
+    const y = marginTop + f * stepY;
+    svg += `<line x1="${marginX}" y1="${y}" x2="${svgW - marginX}" y2="${y}" stroke="rgba(150,170,255,0.3)" stroke-width="1"/>`;
+  }
+  for (let i = 0; i < nStrings; i++) {
+    const x = marginX + i * stepX;
+    const s = LANES[i];
+    const color = LANE_COLOR[s];
+    svg += `<line x1="${x}" y1="${marginTop}" x2="${x}" y2="${marginTop + gridH}" stroke="${color}" stroke-width="1.5" opacity="0.55"/>`;
+    if (posByString.has(s)) {
+      const fret = posByString.get(s);
+      if (fret === 0) {
+        svg += `<circle cx="${x}" cy="${marginTop - 9}" r="4" fill="none" stroke="#e8ecff" stroke-width="1.5"/>`;
+      } else {
+        const row = fret - baseFret;
+        const y = marginTop + (row - 0.5) * stepY;
+        svg += `<circle cx="${x}" cy="${y}" r="6" fill="${color}"/><text x="${x}" y="${y + 3}" font-size="7" fill="#05040c" text-anchor="middle">${fret}</text>`;
+      }
+    } else {
+      svg += `<text x="${x}" y="${marginTop - 5}" font-size="10" fill="#5a5f80" text-anchor="middle">x</text>`;
+    }
+  }
+  svg += `</svg>`;
+  body.innerHTML = svg;
+}
 
 function buildTrackToggles() {
   const box = document.getElementById('trackToggles');
@@ -469,8 +558,45 @@ function judge(laneIdx) {
   document.getElementById('comboEl').textContent = combo > 1 ? combo + 'x combo' : '';
 }
 
+// Rasgueo: un único golpe (barra espaciadora) resuelve TODO el acorde a la vez,
+// en vez de tener que pulsar varias teclas de carril a la vez.
+function judgeChord() {
+  const songTime = audioCtx.currentTime - startCtxTime;
+  let best = null, bestDiff = Infinity;
+  for (const g of chordGroups) {
+    if (g.members.every(m => m.hit || m.missed)) continue;
+    const diff = Math.abs(g.timeSec - songTime);
+    if (diff < bestDiff) { bestDiff = diff; best = g; }
+  }
+  if (best && bestDiff <= HIT_WINDOW) {
+    let anyNew = false;
+    for (const m of best.members) {
+      if (m.hit || m.missed) continue;
+      m.hit = true;
+      anyNew = true;
+      const laneIdx = LANES.indexOf(m.ev.string);
+      if (laneIdx !== -1) spawnHitParticles(laneCenterXAt(laneIdx, 1), HIT_Y, LANE_COLOR[m.ev.string]);
+    }
+    if (anyNew) {
+      combo++; maxCombo = Math.max(maxCombo, combo);
+      score += (Math.round(100 * (1 - bestDiff / HIT_WINDOW)) + combo) * best.members.length;
+    }
+  } else {
+    combo = 0;
+  }
+  document.getElementById('scoreEl').textContent = score;
+  document.getElementById('comboEl').textContent = combo > 1 ? combo + 'x combo' : '';
+}
+
 window.addEventListener('keydown', e => {
   if (e.repeat) return;
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (!running) return;
+    for (let i = 0; i < LANES.length; i++) flashLane(i);
+    judgeChord();
+    return;
+  }
   const idx = KEYS.indexOf(e.key.toLowerCase());
   if (idx === -1 || !running) return;
   flashLane(idx);
@@ -591,6 +717,31 @@ function draw(songTime) {
   ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 12;
   ctx.beginPath(); ctx.moveTo(highwayLeftAt(1), HIT_Y); ctx.lineTo(highwayLeftAt(1) + highwayWidthAt(1), HIT_Y); ctx.stroke();
   ctx.shadowBlur = 0;
+
+  // Panel lateral: qué acorde viene ahora (o está sonando), para ver la mano con tiempo
+  const nextChord = chordGroups.find(g => g.timeSec >= songTime - HIT_WINDOW && g.members.some(m => !m.hit && !m.missed));
+  if ((nextChord || null) !== shownChordGroup) {
+    shownChordGroup = nextChord || null;
+    renderChordPanel(shownChordGroup);
+  }
+
+  // Conectores de acorde: una barra blanca que une las notas que se tocan juntas,
+  // para que se vea que es UN solo golpe y no varias notas sueltas coincidiendo.
+  for (const g of chordGroups) {
+    if (g.members.every(m => m.hit || m.missed)) continue;
+    const dt = g.timeSec - songTime;
+    const y = timeToY(dt);
+    if (y < -30 || y > H + 30) continue;
+    const k = depthAt(y);
+    const xs = g.members.map(m => laneCenterXAt(LANES.indexOf(m.ev.string), k)).filter(x => LANES.length && !isNaN(x));
+    if (xs.length < 2) continue;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.lineWidth = 2 + 2 * k;
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.moveTo(Math.min(...xs), y); ctx.lineTo(Math.max(...xs), y); ctx.stroke();
+    ctx.restore();
+  }
 
   // Notas: rombos brillantes que escalan con la profundidad (más grandes cerca)
   for (const n of notes) {
