@@ -195,7 +195,18 @@ function startGame() {
   if (running) return;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
-  if (!musicGain) { musicGain = audioCtx.createGain(); musicGain.gain.value = musicOn ? 0.8 : 0; musicGain.connect(audioCtx.destination); }
+  if (!musicGain) {
+    musicGain = audioCtx.createGain();
+    musicGain.gain.value = musicOn ? 0.8 : 0;
+    const compressor = audioCtx.createDynamicsCompressor();
+    compressor.threshold.value = -28;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 14;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.18;
+    musicGain.connect(compressor);
+    compressor.connect(audioCtx.destination);
+  }
   stopAllMusic();
   resetState();
   running = true;
@@ -261,7 +272,7 @@ function playSynthNote(startTime, durSec, pitch, type) {
   const gain = audioCtx.createGain();
   osc.type = type === 'bass' ? 'triangle' : 'sawtooth';
   osc.frequency.value = midiToFreq(pitch);
-  const peak = type === 'bass' ? 0.5 : 0.22;
+  const peak = type === 'bass' ? 0.28 : 0.09;
   const attack = 0.008;
   const release = Math.min(0.2, Math.max(0.03, durSec * 0.5));
   const sustainEnd = Math.max(startTime + attack + 0.01, startTime + durSec - release);
@@ -284,7 +295,7 @@ function playDrumHit(startTime, pitch) {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(150, startTime);
     osc.frequency.exponentialRampToValueAtTime(42, startTime + 0.11);
-    gain.gain.setValueAtTime(0.9, startTime);
+    gain.gain.setValueAtTime(0.7, startTime);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.17);
     osc.connect(gain).connect(musicGain);
     osc.start(startTime); osc.stop(startTime + 0.19);
@@ -298,7 +309,7 @@ function playDrumHit(startTime, pitch) {
   filter.frequency.value = isHihat ? 7500 : 1700;
   const gain = audioCtx.createGain();
   const dur = isHihat ? 0.05 : 0.14;
-  gain.gain.setValueAtTime(isHihat ? 0.22 : 0.45, startTime);
+  gain.gain.setValueAtTime(isHihat ? 0.15 : 0.3, startTime);
   gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
   noise.connect(filter).connect(gain).connect(musicGain);
   noise.start(startTime); noise.stop(startTime + dur + 0.02);
