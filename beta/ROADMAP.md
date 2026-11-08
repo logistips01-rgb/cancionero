@@ -1,4 +1,44 @@
-# Hoja de ruta — Guitar Hero desde canción elegida por el usuario
+# Hoja de ruta — Guitle AI
+
+Marca del producto: **Guitle AI** (antes "Guitar Hero" / "Guitle Game" —
+renombrado para no usar la marca registrada de Activision). Dos líneas de
+producto bajo el mismo nombre, con requisitos legales distintos:
+
+1. **Juego gratuito** (`beta/guitar-hero-prototype.html`, lo que tenemos hoy):
+   gancho para atraer clientes a la web de venta de guitarras. Por eso debe
+   ser gratis de verdad (sin coste por uso) — ver el apartado de instrumento
+   más abajo sobre por qué esto apunta a procesado 100% en el navegador.
+2. **App de pago de separación de pistas** (fase futura, producto aparte, no
+   es lo de hoy): el usuario sube un MP3 suyo y la app lo separa en pistas
+   (voz, guitarra, bajo, batería) para hacerse sus propios backing tracks.
+   Mismo modelo que Moises.ai / LALAL.AI / Audioshake — cobrar por la
+   herramienta no cambia lo que hace falta para cumplir (ver más abajo),
+   pero sí añade alcance real: servidor con cómputo (tipo Demucs), cuentas
+   de usuario, cobro. No se monta en esta sesión.
+
+## Instrumento de origen de la canción, y por qué importa para el coste
+
+- Para el juego gratuito, usar una canción famosa de banda completa (ej.
+  Sultans of Swing) obliga a conseguir una licencia o sustituirla por algo
+  de dominio público / royalty-free antes de publicarlo en la web del
+  negocio — usar un fragmento corto NO evita esto, no existe tal excepción.
+- Alternativa que encaja mejor con "gratis, cero infraestructura": que el
+  propio usuario (o la tienda) grabe una pista de UN SOLO instrumento
+  (una demo tocando una guitarra del catálogo, por ejemplo) y se analice
+  tono/ritmo en el propio navegador (sin servidor, sin IA pesada) para
+  generar un chart jugable. Evita además todo el tema de copyright de
+  canciones de terceros, porque la grabación es de quien la sube.
+
+## Reglas que valen para subir archivos de usuarios (gratis o de pago)
+
+- Cada archivo subido y lo que se genera a partir de él se queda privado
+  de quien lo sube — nunca se convierte en una biblioteca que puedan usar
+  otros usuarios (eso sí sería distribución pública, con copyright de por
+  medio, sin importar si se cobra o no por el servicio).
+- Términos de uso: quien sube declara tener derecho a ese archivo.
+- Mejor si el procesado ocurre en el navegador del usuario (nunca toca tu
+  servidor); si hace falta servidor (separación de pistas real), no
+  guardar el archivo más de lo necesario para el procesado.
 
 ## Fase futura: búsqueda y generación automática e instantánea
 
