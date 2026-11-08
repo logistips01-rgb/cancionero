@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Prototipo: Guitar Hero desde tablatura</title>
+<title>Prototipo: Guitle Game desde tablatura</title>
 <style>
   :root {
     --bg-a: #05040c; --bg-b: #0c0a1f; --panel: rgba(20,18,40,0.55); --panel-line: rgba(150,170,255,0.18);
@@ -38,7 +38,7 @@
   }
   .chord-title { font-size: 0.8rem; font-weight: 600; color: #e8ecff; }
   .chord-hint { font-size: 0.62rem; color: #9ba3d0; margin: 0.15rem 0 0.6rem; line-height: 1.3; }
-  .chord-queue { display: flex; flex-direction: column; gap: 0.5rem; max-height: 480px; overflow-y: auto; }
+  .chord-queue { display: flex; flex-direction: column; gap: 0.3rem; }
   .chord-empty { font-size: 0.7rem; color: #5a5f80; font-style: italic; padding: 2.2rem 0; }
   .chord-item { border-radius: 10px; border: 2px solid transparent; padding: 2px; }
   .chord-item.active {
@@ -74,24 +74,32 @@
   .key-chip .chip-e { font-size: 1.3em; }
   .legend { display:flex; gap:1rem; margin-top:0.7rem; font-size:0.72rem; color:#9ba3d0; flex-wrap:wrap; justify-content:center; max-width:520px; }
   .legend span.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:0.3rem; vertical-align:middle; box-shadow: 0 0 6px currentColor; }
+  .instrument-picker { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+  .instrument-card {
+    display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+    min-width: 92px; padding: 0.55rem 0.7rem; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--panel-line); color: #e8ecff; cursor: pointer;
+    font-family: inherit; transition: all 0.15s;
+  }
+  .instrument-card .icon { font-size: 1.3rem; }
+  .instrument-card .title { font-size: 0.82rem; font-weight: 700; }
+  .instrument-card .subtitle { font-size: 0.6rem; color: #9ba3d0; }
+  .instrument-card:hover:not(.disabled) { border-color: #00e5ff; box-shadow: 0 0 14px rgba(0,229,255,0.3); transform: translateY(-1px); }
+  .instrument-card.active { border-color: var(--good); background: rgba(77,255,176,0.12); box-shadow: 0 0 14px rgba(77,255,176,0.35); }
+  .instrument-card.active .subtitle { color: #bfe; }
+  .instrument-card.disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
 </head>
 <body>
-<h1>🎸 Prototipo — Guitar Hero desde tablatura</h1>
+<h1>🎸 Prototipo — Guitle Game desde tablatura</h1>
 <div class="subtitle">
   Elige qué instrumento tocas tú (Sultans of Swing) — el resto suena de fondo
   automáticamente, como una banda.
 </div>
 
-<div style="margin-bottom:0.9rem;">
-  <select id="instrumentSelect" onchange="switchInstrument(this.value)" style="background:rgba(255,255,255,0.05);color:#e8ecff;border:1px solid rgba(150,170,255,0.25);border-radius:8px;padding:0.5rem 0.8rem;font-size:0.85rem;">
-    <option value="tab" selected>🎸 Tab — guitarra líder</option>
-    <option value="ritmo">🎸 Ritmo — guitarra rítmica</option>
-    <option value="bajo">🎵 Bajo (4 cuerdas reales)</option>
-    <option value="bateria" disabled>🥁 Batería (próximamente)</option>
-    <option value="demo">— Demo: tablatura real (Te Quiero)</option>
-  </select>
-  <div id="variantLabel" style="font-size:0.72rem;color:#9ba3d0;margin-top:0.35rem;max-width:480px;">Tab — guitarra líder (Sultans of Swing) — el resto de instrumentos suena de fondo</div>
+<div style="margin-bottom:0.9rem;display:flex;flex-direction:column;align-items:center;">
+  <div class="instrument-picker" id="instrumentPicker"></div>
+  <div id="variantLabel" style="font-size:0.72rem;color:#9ba3d0;margin-top:0.5rem;max-width:480px;text-align:center;">Tab — guitarra líder (Sultans of Swing) — el resto de instrumentos suena de fondo</div>
 </div>
 
 <div class="hud">
@@ -116,6 +124,8 @@
 
 <div class="controls">
   <button onclick="startGame()">▶ Empezar</button>
+  <button onclick="togglePause()" id="pauseBtn">⏸ Pausa</button>
+  <button onclick="stopGame()">⏹ Parar</button>
   <button onclick="testBeep()">🔔 Probar sonido (pitido simple)</button>
   <button onclick="restartGame()">↺ Reiniciar</button>
   <button onclick="toggleMetronome()" id="metroBtn">🔊 Metrónomo: ON</button>
@@ -225,6 +235,7 @@ function drawParticles() {
 let audioCtx = null;
 let startCtxTime = 0;
 let running = false;
+let paused = false;
 let metronomeOn = true;
 let musicOn = true;
 let musicGain = null;
@@ -299,8 +310,12 @@ function chordSvgMarkup(group) {
   const svgH = marginTop + gridH + 10;
   const stepX = nStrings > 1 ? (svgW - marginX * 2) / (nStrings - 1) : 0;
   const stepY = gridH / numFrets;
+  // El dibujo se calcula siempre a tamaño completo (mismo detalle/tipografía);
+  // el tamaño final en pantalla se controla fuera, por viewBox, para que quepan
+  // varios acordes a la vez sin perder nitidez ni necesitar scroll.
+  const renderW = 76, renderH = Math.round(76 * svgH / svgW);
 
-  let svg = `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
+  let svg = `<svg width="${renderW}" height="${renderH}" viewBox="0 0 ${svgW} ${svgH}">`;
   if (baseFret === 0) {
     svg += `<rect x="${marginX}" y="${marginTop}" width="${svgW - marginX * 2}" height="3" fill="#e8ecff"/>`;
   } else {
@@ -375,6 +390,8 @@ function startGame() {
   stopAllMusic();
   resetState();
   running = true;
+  paused = false;
+  document.getElementById('pauseBtn').textContent = '⏸ Pausa';
   startCtxTime = audioCtx.currentTime + 0.3;
   lastBeatScheduled = -1;
   lastFrameMs = null;
@@ -386,8 +403,42 @@ function startGame() {
 
 function restartGame() { running = false; startGame(); }
 
-function switchInstrument(key) {
+// Pausa/reanuda sin perder el progreso: suspender el AudioContext congela su
+// reloj (currentTime deja de avanzar), así que songTime y todo lo ya
+// programado queda exactamente donde estaba al reanudar, sin saltos.
+function togglePause() {
+  if (!running) return;
+  paused = !paused;
+  if (paused) {
+    audioCtx.suspend();
+    stopMusicScheduler();
+    document.getElementById('pauseBtn').textContent = '▶ Reanudar';
+    document.getElementById('statusEl').textContent = 'Pausado';
+  } else {
+    audioCtx.resume();
+    resumeMusicScheduler();
+    lastFrameMs = null;
+    document.getElementById('pauseBtn').textContent = '⏸ Pausa';
+    document.getElementById('statusEl').textContent = 'Tocando…';
+    requestAnimationFrame(loop);
+  }
+}
+
+function stopGame() {
+  if (!running && !paused) return;
   running = false;
+  paused = false;
+  stopAllMusic();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  document.getElementById('pauseBtn').textContent = '⏸ Pausa';
+  document.getElementById('statusEl').textContent = `Detenido — puntuación ${score}, pulsa Empezar`;
+}
+
+function switchInstrument(key) {
+  if (INSTRUMENT_META[key] && INSTRUMENT_META[key].disabled) return;
+  running = false;
+  paused = false;
+  document.getElementById('pauseBtn').textContent = '⏸ Pausa';
   stopAllMusic();
   currentInstrumentKey = key;
   const p = INSTRUMENT_PROFILES[key];
@@ -401,9 +452,34 @@ function switchInstrument(key) {
   document.getElementById('variantLabel').textContent = p.label;
   buildLegend();
   buildTrackToggles();
+  buildInstrumentPicker();
   resetState();
   draw(-NOTE_TRAVEL_SEC);
 }
+
+const INSTRUMENT_META = {
+  tab:     { icon: '🎸', title: 'Tab',     subtitle: 'Guitarra líder' },
+  ritmo:   { icon: '🎸', title: 'Ritmo',   subtitle: 'Guitarra rítmica' },
+  bajo:    { icon: '🎵', title: 'Bajo',    subtitle: '4 cuerdas reales' },
+  bateria: { icon: '🥁', title: 'Batería', subtitle: 'Próximamente', disabled: true },
+  demo:    { icon: '🎼', title: 'Demo',    subtitle: 'Te Quiero (tab real)' },
+};
+const INSTRUMENT_ORDER = ['tab', 'ritmo', 'bajo', 'bateria', 'demo'];
+
+function buildInstrumentPicker() {
+  const box = document.getElementById('instrumentPicker');
+  if (!box) return;
+  box.innerHTML = INSTRUMENT_ORDER.map(key => {
+    const meta = INSTRUMENT_META[key];
+    const cls = ['instrument-card'];
+    if (key === currentInstrumentKey) cls.push('active');
+    if (meta.disabled) cls.push('disabled');
+    const attrs = meta.disabled ? 'disabled' : `onclick="switchInstrument('${key}')"`;
+    return `<button type="button" class="${cls.join(' ')}" ${attrs}>` +
+      `<span class="icon">${meta.icon}</span><span class="title">${meta.title}</span><span class="subtitle">${meta.subtitle}</span></button>`;
+  }).join('');
+}
+buildInstrumentPicker();
 
 function updateSpeedLabel() {
   document.getElementById('speedLabel').textContent = NOTE_TRAVEL_SEC.toFixed(1) + 's en cruzar la pantalla';
@@ -529,6 +605,12 @@ function scheduleMusicWindow() {
 
 function startMusicScheduler() {
   trackPointers = activeMusicTracks.map(() => 0);
+  resumeMusicScheduler();
+}
+
+// Igual que startMusicScheduler() pero sin reiniciar los punteros de pista:
+// se usa al reanudar de una pausa, para seguir donde se quedó la música.
+function resumeMusicScheduler() {
   scheduleMusicWindow();
   if (musicSchedulerTimer) clearInterval(musicSchedulerTimer);
   musicSchedulerTimer = setInterval(scheduleMusicWindow, MUSIC_SCHEDULE_INTERVAL_MS);
@@ -619,13 +701,13 @@ window.addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.code === 'Space') {
     e.preventDefault();
-    if (!running) return;
+    if (!running || paused) return;
     for (let i = 0; i < LANES.length; i++) flashLane(i);
     judgeChord();
     return;
   }
   const idx = KEYS.indexOf(e.key.toLowerCase());
-  if (idx === -1 || !running) return;
+  if (idx === -1 || !running || paused) return;
   flashLane(idx);
   judge(idx);
 });
@@ -750,7 +832,7 @@ function draw(songTime) {
   // después parpadea en verde 0.6s antes de llegar, como aviso para cambiar de mano.
   const CHORD_WARN_LEAD_SEC = 0.6;
   const pendingChords = chordGroups.filter(g => g.timeSec >= songTime - HIT_WINDOW && g.members.some(m => !m.hit && !m.missed));
-  const visibleChords = pendingChords.slice(0, 4);
+  const visibleChords = pendingChords.slice(0, 7);
   const activeChord = visibleChords.find(g => Math.abs(g.timeSec - songTime) <= HIT_WINDOW) || null;
   const warnChord = visibleChords.find(g => g !== activeChord && g.timeSec - songTime > 0 && g.timeSec - songTime <= CHORD_WARN_LEAD_SEC) || null;
   const chordQueueSignature = visibleChords.map(g => g.timeSec).join(',') + '|' + (activeChord ? activeChord.timeSec : '') + '|' + (warnChord ? warnChord.timeSec : '');
@@ -821,7 +903,7 @@ function draw(songTime) {
 
 let lastFrameMs = null;
 function loop(nowMs) {
-  if (!running) return;
+  if (!running || paused) return;
   const frameDt = lastFrameMs != null ? (nowMs - lastFrameMs) / 1000 : 0;
   lastFrameMs = nowMs;
   const songTime = audioCtx.currentTime - startCtxTime;
