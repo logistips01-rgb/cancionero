@@ -92,6 +92,9 @@
   <button onclick="restartGame()">↺ Reiniciar</button>
   <button onclick="toggleMetronome()" id="metroBtn">🔊 Metrónomo: ON</button>
   <button onclick="toggleMusic()" id="musicBtn">🎵 Música: ON</button>
+  <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;"><input type="checkbox" id="trackComp" checked onchange="updateTrackEnabled()">🎸 Guitarra</label>
+  <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;"><input type="checkbox" id="trackBass" checked onchange="updateTrackEnabled()">🎵 Bajo</label>
+  <label style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.82rem;"><input type="checkbox" id="trackDrums" checked onchange="updateTrackEnabled()">🥁 Batería</label>
   <button onclick="adjustSpeed(0.4)">🐢 Más lento</button>
   <button onclick="adjustSpeed(-0.4)">🐇 Más rápido</button>
   <span class="speed-label" id="speedLabel"></span>
@@ -168,7 +171,12 @@ let running = false;
 let metronomeOn = true;
 let musicOn = true;
 let musicGain = null;
+let trackEnabled = { comp: true, bass: true, drums: true };
 let scheduledVoices = [];
+let trackPointers = [];
+let musicSchedulerTimer = null;
+const MUSIC_LOOKAHEAD_SEC = 2.5;
+const MUSIC_SCHEDULE_INTERVAL_MS = 200;
 let sharedNoiseBuffer = null;
 let score = 0, combo = 0, maxCombo = 0;
 let notes = []; // {ev, hit:boolean, missed:boolean}
@@ -215,7 +223,7 @@ function startGame() {
   lastBeatScheduled = -1;
   lastFrameMs = null;
   particles = [];
-  scheduleAllMusic();
+  startMusicScheduler();
   document.getElementById('statusEl').textContent = 'Tocando…';
   requestAnimationFrame(loop);
 }
@@ -248,6 +256,12 @@ updateSpeedLabel();
 function toggleMetronome() {
   metronomeOn = !metronomeOn;
   document.getElementById('metroBtn').textContent = '🔊 Metrónomo: ' + (metronomeOn ? 'ON' : 'OFF');
+}
+
+function updateTrackEnabled() {
+  trackEnabled.comp = document.getElementById('trackComp').checked;
+  trackEnabled.bass = document.getElementById('trackBass').checked;
+  trackEnabled.drums = document.getElementById('trackDrums').checked;
 }
 
 function testBeep() {
@@ -332,17 +346,37 @@ function playDrumHit(startTime, pitch) {
   scheduledVoices.push(noise);
 }
 
-function scheduleAllMusic() {
-  for (const track of activeMusicTracks) {
-    for (const [startSec, durSec, pitch] of track.notes) {
-      const at = startCtxTime + startSec;
-      if (track.type === 'drums') playDrumHit(at, pitch);
-      else playSynthNote(at, durSec, pitch, track.type);
+function scheduleMusicWindow() {
+  const nowSongTime = audioCtx.currentTime - startCtxTime;
+  const horizon = nowSongTime + MUSIC_LOOKAHEAD_SEC;
+  activeMusicTracks.forEach((track, ti) => {
+    let idx = trackPointers[ti] || 0;
+    while (idx < track.notes.length && track.notes[idx][0] <= horizon) {
+      const [startSec, durSec, pitch] = track.notes[idx];
+      if (trackEnabled[track.type]) {
+        const at = startCtxTime + startSec;
+        if (track.type === 'drums') playDrumHit(at, pitch);
+        else playSynthNote(at, durSec, pitch, track.type);
+      }
+      idx++;
     }
-  }
+    trackPointers[ti] = idx;
+  });
+}
+
+function startMusicScheduler() {
+  trackPointers = activeMusicTracks.map(() => 0);
+  scheduleMusicWindow();
+  if (musicSchedulerTimer) clearInterval(musicSchedulerTimer);
+  musicSchedulerTimer = setInterval(scheduleMusicWindow, MUSIC_SCHEDULE_INTERVAL_MS);
+}
+
+function stopMusicScheduler() {
+  if (musicSchedulerTimer) { clearInterval(musicSchedulerTimer); musicSchedulerTimer = null; }
 }
 
 function stopAllMusic() {
+  stopMusicScheduler();
   for (const v of scheduledVoices) { try { v.stop(0); } catch (e) {} }
   scheduledVoices = [];
 }
@@ -564,6 +598,7 @@ function loop(nowMs) {
   draw(songTime);
   if (songTime > CHART.durationSec + NOTE_TRAVEL_SEC) {
     running = false;
+    stopMusicScheduler();
     document.getElementById('statusEl').textContent =
       `Terminado — puntuación ${score}, combo máximo ${maxCombo}`;
     return;
